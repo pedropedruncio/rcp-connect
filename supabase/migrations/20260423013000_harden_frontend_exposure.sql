@@ -7,7 +7,7 @@ set search_path = public
 as $$
   select u."personId"
   from public."User" u
-  where u."supabaseId" = auth.uid()
+  where u."supabaseId"::text = auth.uid()::text
   limit 1
 $$;
 
@@ -21,7 +21,7 @@ as $$
   select r.name
   from public."User" u
   join public."Role" r on r.id = u."roleId"
-  where u."supabaseId" = auth.uid()
+  where u."supabaseId"::text = auth.uid()::text
   limit 1
 $$;
 
@@ -35,7 +35,7 @@ as $$
   select p."campusId"
   from public."User" u
   join public."Person" p on p.id = u."personId"
-  where u."supabaseId" = auth.uid()
+  where u."supabaseId"::text = auth.uid()::text
   limit 1
 $$;
 
@@ -195,7 +195,7 @@ $$;
 
 create or replace function public.can_bootstrap_user(
   row_email text,
-  row_supabase_id uuid,
+  row_supabase_id text,
   row_person_id text,
   row_role_id text
 )
@@ -206,7 +206,7 @@ stable
 set search_path = public
 as $$
   select
-    row_supabase_id = auth.uid()
+    row_supabase_id = auth.uid()::text
     and public.is_own_email(row_email)
     and exists (
       select 1
@@ -308,7 +308,7 @@ on public."User"
 for select
 to authenticated
 using (
-  "supabaseId" = auth.uid()
+  "supabaseId"::text = auth.uid()::text
   or public.is_admin_or_pastor()
   or public.can_read_person_by_id("personId")
 );
@@ -319,7 +319,7 @@ for insert
 to authenticated
 with check (
   public.is_admin_or_pastor()
-  or public.can_bootstrap_user(email, "supabaseId", "personId", "roleId")
+  or public.can_bootstrap_user(email, "supabaseId"::text, "personId", "roleId")
 );
 
 create policy "Only admins can update user access rows"
