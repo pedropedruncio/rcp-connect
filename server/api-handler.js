@@ -57,7 +57,7 @@ function parseCookies(header = '') {
 function sessionCookies(session) {
   const accessMaxAge = Math.max(60, session.expires_in ?? 3600);
   const refreshMaxAge = 60 * 60 * 24 * 30;
-  const secure = process.env.NETLIFY_DEV === 'true' ? '' : '; Secure';
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
 
   return [
     `${ACCESS_COOKIE}=${encodeURIComponent(session.access_token)}; Path=/; Max-Age=${accessMaxAge}; HttpOnly${secure}; SameSite=Strict`,
@@ -66,7 +66,7 @@ function sessionCookies(session) {
 }
 
 function clearCookies() {
-  const secure = process.env.NETLIFY_DEV === 'true' ? '' : '; Secure';
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
 
   return [
     `${ACCESS_COOKIE}=; Path=/; Max-Age=0; HttpOnly${secure}; SameSite=Strict`,
