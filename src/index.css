@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Instrument Serif", serif;
+  --font-headline: "Instrument Serif", serif;
+
+  --color-primary: #9a7b4f;
+  --color-primary-container: #f5eedf;
+  --color-on-primary: #ffffff;
+  
+  --color-secondary: #8c8273;
+  --color-secondary-container: #f7f4ec;
+  
+  --color-tertiary: #1e1b18;
+  --color-tertiary-container: #332d28;
+  --color-on-tertiary: #ffffff;
+
+  --color-gold: #bd903b;
+  --color-gold-light: #dfb256;
+
+  --color-surface: #fcfbf9;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #fdf9f3;
+  --color-surface-container: #f9f5ed;
+  --color-surface-container-high: #f6ebd8;
+  --color-surface-container-highest: #f0e4cc;
+  
+  --color-outline: #e0d9cc;
+  --color-outline-variant: #efe9db;
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-slate-900 font-sans antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-serif tracking-tight;
+  }
+}
+
+@layer components {
+  .glass-header {
+    @apply bg-white/80 backdrop-blur-md border-b border-outline-variant;
+  }
+
+  .card-heritage {
+    @apply bg-white border border-outline-variant rounded-md shadow-[0_1px_2px_rgba(0,0,0,0.05)];
+  }
+
+  .btn-heritage {
+    @apply px-4 py-2 rounded-md font-medium transition-all active:scale-95 disabled:opacity-50;
+  }
+
+  .btn-primary-heritage {
+    @apply px-4 py-2 rounded-md font-medium transition-all active:scale-95 disabled:opacity-50 bg-tertiary text-white hover:bg-tertiary/90 shadow-sm;
+  }
+
+  .btn-secondary-heritage {
+    @apply px-4 py-2 rounded-md font-medium transition-all active:scale-95 disabled:opacity-50 bg-white border border-outline text-slate-700 hover:bg-slate-50;
+  }
+
+  .badge-heritage {
+    @apply px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider;
+  }
+}

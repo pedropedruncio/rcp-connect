@@ -1,0 +1,20 @@
+node_modules/
+build/
+dist/
+coverage/
+test-results/
+playwright-report/
+.DS_Store
+*.log
+.env*
+!.env.example
+.npmrc
+.kilocode/
+setup_admin*.js
+insert_admin.sql
+supabase/.temp/
+
+# Local Netlify folder
+.netlify
+
+.vercel
