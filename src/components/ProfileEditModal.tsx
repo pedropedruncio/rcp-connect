@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, User, Phone, MapPin } from 'lucide-react';
 
@@ -6,7 +6,7 @@ interface ProfileEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   person: any; // Using any for mock, realistically type Person
-  onSave: (data: any) => void;
+  onSave: (data: any) => Promise<void> | void;
 }
 
 export default function ProfileEditModal({ isOpen, onClose, person, onSave }: ProfileEditModalProps) {
@@ -14,13 +14,32 @@ export default function ProfileEditModal({ isOpen, onClose, person, onSave }: Pr
     phone: person?.phone || '',
     address: person?.address || '',
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setFormData({
+      phone: person?.phone || '',
+      address: person?.address || '',
+    });
+  }, [isOpen, person?.address, person?.phone]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
-    onClose();
+    setIsSubmitting(true);
+
+    try {
+      await onSave({
+        phone: formData.phone.trim(),
+        address: formData.address.trim(),
+      });
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -79,15 +98,17 @@ export default function ProfileEditModal({ isOpen, onClose, person, onSave }: Pr
               <button
                 type="button"
                 onClick={onClose}
+                disabled={isSubmitting}
                 className="px-5 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="btn-primary-heritage"
+                disabled={isSubmitting}
+                className="btn-primary-heritage disabled:opacity-70"
               >
-                Guardar Alterações
+                {isSubmitting ? 'A guardar...' : 'Guardar Alterações'}
               </button>
             </div>
           </form>

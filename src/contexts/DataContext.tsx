@@ -8,12 +8,11 @@ import React, {
   type ReactNode,
 } from 'react';
 import { useAuth, type Role } from './AuthContext';
-import { supabase } from '../lib/supabase';
+import { apiRequest } from '../lib/api';
 import {
   ensureTimeValue,
   getPersonRoleLabel,
   getUpcomingStatus,
-  isMissingSchemaError,
   type DomainState,
 } from '../lib/domain';
 import type {
@@ -77,17 +76,16 @@ interface DataContextType extends DomainState {
   saveNotificationPreference: (preference: NotificationPreference) => Promise<void>;
 }
 
-interface OptionalSelectResult<T> {
-  available: boolean;
-  data: T[];
-}
-
 type PersonRow = {
   id: string;
   firstName: string;
   lastName: string | null;
   email: string | null;
   phone: string | null;
+  address: string | null;
+  birthdate: string | null;
+  notes: string | null;
+  avatarUrl: string | null;
   status: Person['status'] | null;
   campusId: string | null;
   cellGroupId: string | null;
@@ -190,6 +188,23 @@ const DEFAULT_SUPPORTS: SchemaCapabilities = {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+interface DataApiResponse {
+  supports: SchemaCapabilities;
+  campuses: CampusRow[];
+  roles: RoleRow[];
+  users: UserRow[];
+  persons: PersonRow[];
+  cells: CellRow[];
+  discipleshipPairs: PairRow[];
+  followUps: FollowUpRow[];
+  families: FamilyRow[];
+  ministries: MinistryRow[];
+  events: EventRow[];
+  schedules: ScheduleRow[];
+  preferences: NotificationPreferenceRow[];
+  settings: AppSetting[];
+}
+
 function splitName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return {
@@ -246,10 +261,10 @@ function mapDomainState(
       role: inferPersonRole(row.id, roleName, cellRows, pairRows, status),
       cellId: row.cellGroupId,
       since: new Date().getFullYear().toString(),
-      address: '',
-      birthdate: '',
-      notes: '',
-      avatarUrl: null,
+      address: row.address ?? '',
+      birthdate: row.birthdate ?? '',
+      notes: row.notes ?? '',
+      avatarUrl: row.avatarUrl ?? null,
     };
   });
 
@@ -382,22 +397,6 @@ function mapDomainState(
   };
 }
 
-async function selectOptional<T>(table: string, columns: string): Promise<OptionalSelectResult<T>> {
-  const { data, error } = await supabase.from(table).select(columns);
-
-  if (error) {
-    if (isMissingSchemaError(error.message)) {
-      return { available: false, data: [] };
-    }
-    throw error;
-  }
-
-  return {
-    available: true,
-    data: (data ?? []) as T[],
-  };
-}
-
 export function DataProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
   const [state, setState] = useState<DomainState>(EMPTY_STATE);
@@ -418,96 +417,31 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      const [
-        campusResult,
-        roleResult,
-        userResult,
-        personResult,
-        cellResult,
-        pairResult,
-        followUpResult,
-        familyResult,
-        ministryResult,
-        eventResult,
-        scheduleResult,
-        familyMembersResult,
-        ministryMembersResult,
-        eventRegistrationsResult,
-        scheduleAssignmentsResult,
-        preferencesResult,
-        settingsResult,
-      ] = await Promise.all([
-        supabase.from('Campus').select('id, name, createdAt').order('name'),
-        supabase.from('Role').select('id, name, description, createdAt').order('name'),
-        supabase.from('User').select('id, email, personId, roleId, supabaseId, createdAt'),
-        supabase.from('Person').select('id, firstName, lastName, email, phone, status, campusId, cellGroupId'),
-        supabase.from('CellGroup').select('id, name, leaderId, day, time, location, campusId, health'),
-        supabase.from('DiscipleshipPair').select('id, mentorId, discipleId, course, progress, lastMeeting, startDate'),
-        supabase.from('FollowUp').select('id, personId, responsibleId, type, date, status, priority, notes'),
-        supabase.from('Family').select('id, name'),
-        supabase.from('Ministry').select('id, name, description'),
-        supabase.from('Event').select('id, name, description, date, campusId'),
-        supabase.from('Schedule').select('id, ministryId, date, time, status'),
-        selectOptional('FamilyMember', 'id'),
-        selectOptional('MinistryMember', 'id'),
-        selectOptional('EventRegistration', 'id'),
-        selectOptional('ScheduleAssignment', 'id'),
-        selectOptional<NotificationPreferenceRow>(
-          'NotificationPreference',
-          'id, personId, pushEnabled, emailDigestEnabled, smsEnabled',
-        ),
-        selectOptional<AppSetting>('AppSetting', 'id, settingKey, settingValue, scope'),
-      ]);
+      const data = await apiRequest<DataApiResponse>('/data');
 
-      const requiredResults = [
-        campusResult,
-        roleResult,
-        userResult,
-        personResult,
-        cellResult,
-        pairResult,
-        followUpResult,
-        familyResult,
-        ministryResult,
-        eventResult,
-        scheduleResult,
-      ];
-
-      const requiredError = requiredResults.find((result) => result.error)?.error;
-      if (requiredError) {
-        throw requiredError;
-      }
-
-      setSupports({
-        familyMembers: familyMembersResult.available,
-        ministryMembers: ministryMembersResult.available,
-        eventRegistrations: eventRegistrationsResult.available,
-        scheduleAssignments: scheduleAssignmentsResult.available,
-        notificationPreferences: preferencesResult.available,
-        appSettings: settingsResult.available,
-      });
+      setSupports(data.supports);
 
       setState(
         mapDomainState(
-          (campusResult.data ?? []) as CampusRow[],
-          (roleResult.data ?? []) as RoleRow[],
-          (userResult.data ?? []) as UserRow[],
-          (personResult.data ?? []) as PersonRow[],
-          (cellResult.data ?? []) as CellRow[],
-          (pairResult.data ?? []) as PairRow[],
-          (followUpResult.data ?? []) as FollowUpRow[],
-          (familyResult.data ?? []) as FamilyRow[],
-          (ministryResult.data ?? []) as MinistryRow[],
-          (eventResult.data ?? []) as EventRow[],
-          (scheduleResult.data ?? []) as ScheduleRow[],
-          preferencesResult.data,
-          settingsResult.data,
+          data.campuses,
+          data.roles,
+          data.users,
+          data.persons,
+          data.cells,
+          data.discipleshipPairs,
+          data.followUps,
+          data.families,
+          data.ministries,
+          data.events,
+          data.schedules,
+          data.preferences,
+          data.settings,
         ),
       );
     } catch (currentError: any) {
       console.error('Erro ao carregar dados da aplicação:', currentError);
       setState(EMPTY_STATE);
-      setError(currentError?.message ?? 'Não foi possível carregar os dados do Supabase.');
+      setError(currentError?.message ?? 'Não foi possível carregar os dados da aplicação.');
     } finally {
       setIsLoading(false);
     }
@@ -537,11 +471,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [state.cells],
   );
 
-  const roleIdByName = useMemo(
-    () => new Map(state.roles.map((role) => [role.name, role.id])),
-    [state.roles],
-  );
-
   const persistPerson = useCallback(
     async (id: string | undefined, data: Partial<PersonInput>) => {
       const existing = id ? getPersonById(id) : undefined;
@@ -560,36 +489,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
         lastName,
         email: data.email ?? existing?.email ?? null,
         phone: data.phone ?? existing?.phone ?? null,
+        address: data.address ?? existing?.address ?? null,
+        birthdate: data.birthdate ?? existing?.birthdate ?? null,
+        notes: data.notes ?? existing?.notes ?? null,
+        avatarUrl: data.avatarUrl ?? existing?.avatarUrl ?? null,
         status: data.status ?? existing?.status ?? 'VISITANTE',
         campusId: data.campusId ?? existing?.campusId ?? null,
         cellGroupId: data.cellId ?? existing?.cellId ?? null,
       };
 
       if (id) {
-        const { error: updateError } = await supabase.from('Person').update(payload).eq('id', id);
-        if (updateError) throw updateError;
+        await apiRequest(`/people/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ ...payload, roleName }),
+        });
       } else {
-        const { error: insertError } = await supabase.from('Person').insert(payload);
-        if (insertError) throw insertError;
-      }
-
-      if (id && roleName && roleIdByName.has(roleName)) {
-        const roleId = roleIdByName.get(roleName);
-        const userRow = state.users.find((entry) => entry.personId === id);
-
-        if (userRow && roleId) {
-          const { error: roleError } = await supabase
-            .from('User')
-            .update({ roleId })
-            .eq('id', userRow.id);
-
-          if (roleError) throw roleError;
-        }
+        await apiRequest('/people', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
       }
 
       await refetch();
     },
-    [getPersonById, refetch, roleIdByName, state.users],
+    [getPersonById, refetch],
   );
 
   const addPerson = useCallback(async (person: PersonInput) => {
@@ -612,8 +535,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       health: cell.health,
     };
 
-    const { error: insertError } = await supabase.from('CellGroup').insert(payload);
-    if (insertError) throw insertError;
+    await apiRequest('/cells', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
     await refetch();
   }, [refetch]);
 
@@ -628,13 +553,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
       ...(data.health ? { health: data.health } : {}),
     };
 
-    const { error: updateError } = await supabase.from('CellGroup').update(payload).eq('id', id);
-    if (updateError) throw updateError;
+    await apiRequest(`/cells/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
     await refetch();
   }, [refetch]);
 
   const addDiscipleshipPair = useCallback(async (pair: DiscipleshipPairInput) => {
-    const { error: insertError } = await supabase.from('DiscipleshipPair').insert({
+    await apiRequest('/discipleship-pairs', {
+      method: 'POST',
+      body: JSON.stringify({
       id: pair.id ?? `dp_${crypto.randomUUID()}`,
       mentorId: pair.mentorId,
       discipleId: pair.discipleId,
@@ -642,20 +571,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
       progress: pair.progress,
       lastMeeting: pair.lastMeeting,
       startDate: pair.startDate,
+      }),
     });
 
-    if (insertError) throw insertError;
     await refetch();
   }, [refetch]);
 
   const updateDiscipleshipPair = useCallback(async (id: string, data: Partial<DiscipleshipPairInput>) => {
-    const { error: updateError } = await supabase.from('DiscipleshipPair').update(data).eq('id', id);
-    if (updateError) throw updateError;
+    await apiRequest(`/discipleship-pairs/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
     await refetch();
   }, [refetch]);
 
   const addFollowUp = useCallback(async (followUp: FollowUpInput) => {
-    const { error: insertError } = await supabase.from('FollowUp').insert({
+    await apiRequest('/follow-ups', {
+      method: 'POST',
+      body: JSON.stringify({
       id: followUp.id ?? `fu_${crypto.randomUUID()}`,
       personId: followUp.personId,
       responsibleId: followUp.responsibleId,
@@ -664,9 +597,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       status: followUp.status,
       priority: followUp.priority,
       notes: followUp.notes,
+      }),
     });
 
-    if (insertError) throw insertError;
     await refetch();
   }, [refetch]);
 
@@ -681,104 +614,113 @@ export function DataProvider({ children }: { children: ReactNode }) {
       ...(data.notes !== undefined ? { notes: data.notes } : {}),
     };
 
-    const { error: updateError } = await supabase.from('FollowUp').update(payload).eq('id', id);
-    if (updateError) throw updateError;
+    await apiRequest(`/follow-ups/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
     await refetch();
   }, [refetch]);
 
   const addFamily = useCallback(async (family: FamilyInput) => {
-    const { error: insertError } = await supabase.from('Family').insert({
+    await apiRequest('/families', {
+      method: 'POST',
+      body: JSON.stringify({
       id: family.id ?? `fam_${crypto.randomUUID()}`,
       name: family.name,
+      }),
     });
 
-    if (insertError) throw insertError;
     await refetch();
   }, [refetch]);
 
   const updateFamily = useCallback(async (id: string, data: Partial<FamilyInput>) => {
-    const { error: updateError } = await supabase.from('Family').update({ name: data.name }).eq('id', id);
-    if (updateError) throw updateError;
+    await apiRequest(`/families/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name: data.name }),
+    });
     await refetch();
   }, [refetch]);
 
   const addMinistry = useCallback(async (ministry: MinistryInput) => {
-    const { error: insertError } = await supabase.from('Ministry').insert({
+    await apiRequest('/ministries', {
+      method: 'POST',
+      body: JSON.stringify({
       id: ministry.id ?? `min_${crypto.randomUUID()}`,
       name: ministry.name,
       description: ministry.description,
+      }),
     });
 
-    if (insertError) throw insertError;
     await refetch();
   }, [refetch]);
 
   const updateMinistry = useCallback(async (id: string, data: Partial<MinistryInput>) => {
-    const { error: updateError } = await supabase
-      .from('Ministry')
-      .update({
+    await apiRequest(`/ministries/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
         ...(data.name ? { name: data.name } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
-      })
-      .eq('id', id);
+      }),
+    });
 
-    if (updateError) throw updateError;
     await refetch();
   }, [refetch]);
 
   const addEvent = useCallback(async (event: EventInput) => {
-    const { error: insertError } = await supabase.from('Event').insert({
+    await apiRequest('/events', {
+      method: 'POST',
+      body: JSON.stringify({
       id: event.id ?? `evt_${crypto.randomUUID()}`,
       name: event.name,
       description: event.description,
       date: event.date,
       campusId: event.campusId,
+      }),
     });
 
-    if (insertError) throw insertError;
     await refetch();
   }, [refetch]);
 
   const updateEvent = useCallback(async (id: string, data: Partial<EventInput>) => {
-    const { error: updateError } = await supabase
-      .from('Event')
-      .update({
+    await apiRequest(`/events/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
         ...(data.name ? { name: data.name } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
         ...(data.date ? { date: data.date } : {}),
         ...(data.campusId !== undefined ? { campusId: data.campusId } : {}),
-      })
-      .eq('id', id);
+      }),
+    });
 
-    if (updateError) throw updateError;
     await refetch();
   }, [refetch]);
 
   const addSchedule = useCallback(async (schedule: ScheduleInput) => {
-    const { error: insertError } = await supabase.from('Schedule').insert({
+    await apiRequest('/schedules', {
+      method: 'POST',
+      body: JSON.stringify({
       id: schedule.id ?? `sch_${crypto.randomUUID()}`,
       ministryId: schedule.ministryId,
       date: schedule.date,
       time: schedule.time,
       status: schedule.status,
+      }),
     });
 
-    if (insertError) throw insertError;
     await refetch();
   }, [refetch]);
 
   const updateSchedule = useCallback(async (id: string, data: Partial<ScheduleInput>) => {
-    const { error: updateError } = await supabase
-      .from('Schedule')
-      .update({
+    await apiRequest(`/schedules/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
         ...(data.ministryId !== undefined ? { ministryId: data.ministryId } : {}),
         ...(data.date ? { date: data.date } : {}),
         ...(data.time ? { time: data.time } : {}),
         ...(data.status ? { status: data.status } : {}),
-      })
-      .eq('id', id);
+      }),
+    });
 
-    if (updateError) throw updateError;
     await refetch();
   }, [refetch]);
 
@@ -787,15 +729,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
       throw new Error('A tabela NotificationPreference ainda não está disponível no projeto remoto.');
     }
 
-    const { error: upsertError } = await supabase.from('NotificationPreference').upsert({
-      id: preference.id ?? `np_${crypto.randomUUID()}`,
-      personId: preference.personId,
-      pushEnabled: preference.pushEnabled,
-      emailDigestEnabled: preference.emailDigestEnabled,
-      smsEnabled: preference.smsEnabled,
+    await apiRequest('/notification-preferences', {
+      method: 'PUT',
+      body: JSON.stringify({
+        id: preference.id ?? `np_${crypto.randomUUID()}`,
+        personId: preference.personId,
+        pushEnabled: preference.pushEnabled,
+        emailDigestEnabled: preference.emailDigestEnabled,
+        smsEnabled: preference.smsEnabled,
+      }),
     });
 
-    if (upsertError) throw upsertError;
     await refetch();
   }, [refetch, supports.notificationPreferences]);
 

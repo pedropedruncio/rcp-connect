@@ -5,23 +5,23 @@ Aplicação React/Vite do RCP Connect com Supabase remoto como backend principal
 ## Produção
 
 - Frontend: `https://rcp-connect-web-pedro.netlify.app`
-- Supabase: `https://jmheztwhdrjfzfkibwko.supabase.co`
+- Supabase: configurado por variáveis de ambiente, sem project ref publicado no repositório
 
 ## Setup
 
 1. Instale dependências com `npm install`
 2. Copie `.env.example` para `.env`
 3. Preencha:
-   `VITE_SUPABASE_URL`
-   `VITE_SUPABASE_ANON_KEY`
-   `VITE_APP_URL`
-   `VITE_ENABLE_GOOGLE_AUTH`
-4. Rode `npm run dev`
+   `SUPABASE_URL`
+   `SUPABASE_ANON_KEY`
+4. Rode com Netlify Functions para que o browser use `/api/*`:
+   `npx netlify dev`
 
 ## Fluxo de Auth
 
 - Magic link por email
-- Google OAuth opcional, ativado apenas quando o provider estiver configurado no Supabase e `VITE_ENABLE_GOOGLE_AUTH="true"`
+- Email/password pelo endpoint serverless `/api/auth/login`
+- A sessão fica em cookies `HttpOnly`, sem tokens Supabase acessíveis ao JavaScript do browser
 - Primeiro acesso cria `Person` e `User` automaticamente com role inicial `MEMBER`
 
 ## Validação

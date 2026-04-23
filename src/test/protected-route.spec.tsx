@@ -36,7 +36,7 @@ describe('ProtectedRoute', () => {
       isAuthenticated: false,
       isLoading: false,
       isGoogleAuthEnabled: false,
-      signInWithEmail: vi.fn(),
+      signInWithPassword: vi.fn(),
       signInWithGoogle: vi.fn(),
       logout: vi.fn(),
     });
@@ -64,7 +64,7 @@ describe('ProtectedRoute', () => {
       isAuthenticated: true,
       isLoading: false,
       isGoogleAuthEnabled: false,
-      signInWithEmail: vi.fn(),
+      signInWithPassword: vi.fn(),
       signInWithGoogle: vi.fn(),
       logout: vi.fn(),
     });

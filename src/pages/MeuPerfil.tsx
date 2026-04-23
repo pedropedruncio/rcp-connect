@@ -12,7 +12,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { formatDateLabel, getInitials } from '../lib/domain';
-import PersonFormModal from '../components/modals/PersonFormModal';
+import ProfileEditModal from '../components/ProfileEditModal';
 import PrayerRequestModal from '../components/PrayerRequestModal';
 import Toast from '../components/ui/Toast';
 
@@ -26,6 +26,7 @@ export default function MeuPerfil() {
     isLoading,
     addFollowUp,
     persons,
+    updatePerson,
   } = useData();
   const [isEditModalOpen, setEditModalOpen] = React.useState(false);
   const [isPrayerModalOpen, setPrayerModalOpen] = React.useState(false);
@@ -84,13 +85,29 @@ export default function MeuPerfil() {
     }
   };
 
+  const handleProfileUpdate = async (data: { phone: string; address: string }) => {
+    if (!person) return;
+
+    try {
+      await updatePerson(user.id, data);
+      setToast({ show: true, msg: 'Os seus dados foram atualizados com sucesso.', type: 'success' });
+    } catch (error: any) {
+      setToast({
+        show: true,
+        msg: error?.message ?? 'Não foi possível atualizar os seus dados.',
+        type: 'error',
+      });
+      throw error;
+    }
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8 p-8">
-      <PersonFormModal
+      <ProfileEditModal
         isOpen={isEditModalOpen}
         onClose={() => setEditModalOpen(false)}
-        initialData={person}
-        onSuccess={() => setToast({ show: true, msg: 'Os seus dados foram atualizados com sucesso.', type: 'success' })}
+        person={person}
+        onSave={handleProfileUpdate}
       />
 
       <PrayerRequestModal
