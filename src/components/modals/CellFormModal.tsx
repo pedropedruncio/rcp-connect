@@ -86,15 +86,16 @@ export default function CellFormModal({ isOpen, onClose, onSuccess, initialData 
                 </div>
                 <h3 className="text-xl font-bold text-slate-900">{initialData ? 'Editar célula' : 'Nova célula'}</h3>
               </div>
-              <button onClick={onClose} className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100">
+              <button onClick={onClose} className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100" aria-label="Fechar">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <form id="cell-form" onSubmit={handleSubmit} className="space-y-6 p-8">
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Nome da célula</label>
+                <label htmlFor="cell-name" className="text-xs font-bold uppercase tracking-widest text-slate-500">Nome da célula</label>
                 <input
+                  id="cell-name"
                   required
                   type="text"
                   value={formData.name}
@@ -105,8 +106,9 @@ export default function CellFormModal({ isOpen, onClose, onSuccess, initialData 
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Líder responsável</label>
+                  <label htmlFor="cell-leader" className="text-xs font-bold uppercase tracking-widest text-slate-500">Líder responsável</label>
                   <select
+                    id="cell-leader"
                     required
                     value={formData.leaderId}
                     onChange={(event) => setFormData((current) => ({ ...current, leaderId: event.target.value }))}
@@ -122,8 +124,9 @@ export default function CellFormModal({ isOpen, onClose, onSuccess, initialData 
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Campus</label>
+                  <label htmlFor="cell-campus" className="text-xs font-bold uppercase tracking-widest text-slate-500">Campus</label>
                   <select
+                    id="cell-campus"
                     value={formData.campusId ?? ''}
                     onChange={(event) => setFormData((current) => ({ ...current, campusId: event.target.value || null }))}
                     className="input-heritage"
@@ -140,8 +143,9 @@ export default function CellFormModal({ isOpen, onClose, onSuccess, initialData 
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Dia</label>
+                  <label htmlFor="cell-day" className="text-xs font-bold uppercase tracking-widest text-slate-500">Dia</label>
                   <select
+                    id="cell-day"
                     value={formData.day}
                     onChange={(event) => setFormData((current) => ({ ...current, day: event.target.value }))}
                     className="input-heritage"
@@ -154,8 +158,9 @@ export default function CellFormModal({ isOpen, onClose, onSuccess, initialData 
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Hora</label>
+                  <label htmlFor="cell-time" className="text-xs font-bold uppercase tracking-widest text-slate-500">Hora</label>
                   <input
+                    id="cell-time"
                     type="time"
                     value={formData.time}
                     onChange={(event) => setFormData((current) => ({ ...current, time: event.target.value }))}
@@ -163,8 +168,9 @@ export default function CellFormModal({ isOpen, onClose, onSuccess, initialData 
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Saúde</label>
+                  <label htmlFor="cell-health" className="text-xs font-bold uppercase tracking-widest text-slate-500">Saúde</label>
                   <select
+                    id="cell-health"
                     value={formData.health}
                     onChange={(event) => setFormData((current) => ({ ...current, health: event.target.value as CellInput['health'] }))}
                     className="input-heritage"
@@ -177,8 +183,9 @@ export default function CellFormModal({ isOpen, onClose, onSuccess, initialData 
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Localização</label>
+                <label htmlFor="cell-location" className="text-xs font-bold uppercase tracking-widest text-slate-500">Localização</label>
                 <input
+                  id="cell-location"
                   required
                   type="text"
                   value={formData.location}

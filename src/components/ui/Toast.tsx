@@ -44,7 +44,7 @@ export default function Toast({ message, type = 'success', isVisible, onClose, d
           
           <p className="text-sm font-bold flex-1">{message}</p>
           
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full transition-colors">
+          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full transition-colors" aria-label="Fechar">
             <X className="w-4 h-4 text-slate-400" />
           </button>
           
