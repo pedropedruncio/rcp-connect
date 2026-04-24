@@ -218,7 +218,7 @@ export default function Pessoas() {
                   </td>
                   {p.canEditMember && (
                     <td className="px-8 py-4 text-right">
-                      <button className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-surface-container-high rounded-md transition-all">
+                      <button className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-surface-container-high rounded-md transition-all" aria-label="Mais opções">
                         <MoreVertical className="w-4 h-4" />
                       </button>
                     </td>

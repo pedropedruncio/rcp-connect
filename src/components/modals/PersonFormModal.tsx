@@ -118,7 +118,7 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
                   <p className="text-sm text-slate-500">Dados básicos, eclesiásticos e de contacto.</p>
                 </div>
               </div>
-              <button onClick={onClose} className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100">
+              <button onClick={onClose} className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100" aria-label="Fechar">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -126,8 +126,9 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
             <form id="person-form" onSubmit={handleSubmit} className="flex-1 space-y-8 overflow-y-auto p-8">
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Primeiro nome</label>
+                  <label htmlFor="person-firstName" className="text-xs font-bold uppercase tracking-widest text-slate-500">Primeiro nome</label>
                   <input
+                    id="person-firstName"
                     required
                     type="text"
                     value={formData.firstName}
@@ -136,8 +137,9 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Apelido</label>
+                  <label htmlFor="person-lastName" className="text-xs font-bold uppercase tracking-widest text-slate-500">Apelido</label>
                   <input
+                    id="person-lastName"
                     type="text"
                     value={formData.lastName}
                     onChange={(event) => setFormData((current) => ({ ...current, lastName: event.target.value }))}
@@ -148,8 +150,9 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
 
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Email</label>
+                  <label htmlFor="person-email" className="text-xs font-bold uppercase tracking-widest text-slate-500">Email</label>
                   <input
+                    id="person-email"
                     type="email"
                     value={formData.email}
                     onChange={(event) => setFormData((current) => ({ ...current, email: event.target.value }))}
@@ -157,8 +160,9 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Telefone</label>
+                  <label htmlFor="person-phone" className="text-xs font-bold uppercase tracking-widest text-slate-500">Telefone</label>
                   <input
+                    id="person-phone"
                     type="text"
                     value={formData.phone}
                     onChange={(event) => setFormData((current) => ({ ...current, phone: event.target.value }))}
@@ -169,8 +173,9 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
 
               <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Campus</label>
+                  <label htmlFor="person-campus" className="text-xs font-bold uppercase tracking-widest text-slate-500">Campus</label>
                   <select
+                    id="person-campus"
                     value={formData.campusId ?? ''}
                     onChange={(event) => setFormData((current) => ({ ...current, campusId: event.target.value || null }))}
                     className="input-heritage"
@@ -184,8 +189,9 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Célula</label>
+                  <label htmlFor="person-cell" className="text-xs font-bold uppercase tracking-widest text-slate-500">Célula</label>
                   <select
+                    id="person-cell"
                     value={formData.cellId ?? ''}
                     onChange={(event) => setFormData((current) => ({ ...current, cellId: event.target.value || null }))}
                     className="input-heritage"
@@ -199,8 +205,9 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Estado</label>
+                  <label htmlFor="person-status" className="text-xs font-bold uppercase tracking-widest text-slate-500">Estado</label>
                   <select
+                    id="person-status"
                     value={formData.status}
                     onChange={(event) => setFormData((current) => ({ ...current, status: event.target.value as PersonInput['status'] }))}
                     className="input-heritage"
@@ -215,8 +222,9 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
 
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Papel de acesso</label>
+                  <label htmlFor="person-role" className="text-xs font-bold uppercase tracking-widest text-slate-500">Papel de acesso</label>
                   <select
+                    id="person-role"
                     value={formData.role}
                     onChange={(event) => setFormData((current) => ({ ...current, role: event.target.value as Role }))}
                     className="input-heritage"
@@ -229,8 +237,9 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Nascimento</label>
+                  <label htmlFor="person-birthdate" className="text-xs font-bold uppercase tracking-widest text-slate-500">Nascimento</label>
                   <input
+                    id="person-birthdate"
                     type="date"
                     value={formData.birthdate ?? ''}
                     onChange={(event) => setFormData((current) => ({ ...current, birthdate: event.target.value }))}
@@ -240,8 +249,9 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Observações</label>
+                <label htmlFor="person-notes" className="text-xs font-bold uppercase tracking-widest text-slate-500">Observações</label>
                 <textarea
+                  id="person-notes"
                   value={formData.notes ?? ''}
                   onChange={(event) => setFormData((current) => ({ ...current, notes: event.target.value }))}
                   className="input-heritage min-h-[120px] py-3"
