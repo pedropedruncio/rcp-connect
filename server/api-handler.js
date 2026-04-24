@@ -495,12 +495,38 @@ export async function handler(event) {
     }
 
     const body = event.body ? JSON.parse(event.body) : {};
+    const authUser = await getAuthUser(auth.client, auth.user);
+    const role = authUser.role;
+
+    // Defense in depth: Check roles before mutation
+    const isLdr = ['LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'].includes(role);
+    const isPst = ['PASTOR', 'ADMIN'].includes(role);
+    const isAdmin = role === 'ADMIN';
+
+    const enforce = (allowed) => {
+      if (!allowed) {
+        const err = new Error('Sem permissão.');
+        err.statusCode = 403;
+        throw err;
+      }
+    };
+
+    const [resource, id] = path.split('/').slice(1);
+    if (method !== 'GET') {
+      if (resource === 'people' && method === 'POST') enforce(isLdr);
+      if (resource === 'people' && method === 'PATCH') {
+        enforce(isLdr || id === authUser.id);
+        if (body.roleName) enforce(isAdmin);
+      }
+      if (['cells', 'families', 'ministries', 'events', 'schedules'].includes(resource)) enforce(isPst);
+      if (['discipleship-pairs', 'follow-ups'].includes(resource)) enforce(isLdr);
+    }
+
     await handleMutation(auth.client, method, path, body);
     return json(200, { ok: true }, auth.cookies);
   } catch (error) {
     console.error(error);
-    return json(error.statusCode ?? 500, {
-      error: error.message ?? 'Erro interno.',
-    });
+    const code = error.statusCode ?? 500;
+    return json(code, { error: code === 500 ? 'Erro interno.' : (error.message ?? 'Erro.') });
   }
 }
