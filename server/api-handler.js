@@ -499,8 +499,8 @@ export async function handler(event) {
     return json(200, { ok: true }, auth.cookies);
   } catch (error) {
     console.error(error);
-    return json(error.statusCode ?? 500, {
-      error: error.message ?? 'Erro interno.',
-    });
+    const statusCode = error.statusCode ?? 500;
+    const message = statusCode === 500 ? 'Erro interno no servidor.' : (error.message ?? 'Erro inesperado.');
+    return json(statusCode, { error: message });
   }
 }
