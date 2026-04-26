@@ -1,0 +1,4 @@
+## 2025-05-15 - Missing Server-Side Authorization & Information Leakage
+**Vulnerability:** The application relied solely on Supabase Row Level Security (RLS) for data protection, while the `server/api-handler.js` gateway lacked explicit role-based authorization checks for mutations. Additionally, internal server errors (500) were leaking implementation details and potentially database schema info through raw error messages.
+**Learning:** Security should be implemented in layers (Defense in Depth). While RLS is powerful, having a secondary authorization check at the API gateway level provides a fail-safe and clearer control over allowed operations. Masking internal errors is crucial to prevent reconnaissance by attackers.
+**Prevention:** Always implement server-side authorization checks for all destructive operations (POST, PATCH, DELETE) at the entry point. Use generic error messages for 500 status codes in production-facing APIs.

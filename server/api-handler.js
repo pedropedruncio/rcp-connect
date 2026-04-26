@@ -428,26 +428,78 @@ async function updatePerson(client, id, payload) {
   }
 }
 
-async function handleMutation(client, method, path, body) {
+async function handleMutation(client, method, path, body, role) {
   const [, resource, id] = path.split('/');
 
-  if (resource === 'people' && method === 'POST') return insertRow(client, 'Person', body);
-  if (resource === 'people' && method === 'PATCH' && id) return updatePerson(client, id, body);
-  if (resource === 'cells' && method === 'POST') return insertRow(client, 'CellGroup', body);
-  if (resource === 'cells' && method === 'PATCH' && id) return updateRow(client, 'CellGroup', id, body);
-  if (resource === 'discipleship-pairs' && method === 'POST') return insertRow(client, 'DiscipleshipPair', body);
-  if (resource === 'discipleship-pairs' && method === 'PATCH' && id) return updateRow(client, 'DiscipleshipPair', id, body);
-  if (resource === 'follow-ups' && method === 'POST') return insertRow(client, 'FollowUp', body);
-  if (resource === 'follow-ups' && method === 'PATCH' && id) return updateRow(client, 'FollowUp', id, body);
-  if (resource === 'families' && method === 'POST') return insertRow(client, 'Family', body);
-  if (resource === 'families' && method === 'PATCH' && id) return updateRow(client, 'Family', id, body);
-  if (resource === 'ministries' && method === 'POST') return insertRow(client, 'Ministry', body);
-  if (resource === 'ministries' && method === 'PATCH' && id) return updateRow(client, 'Ministry', id, body);
-  if (resource === 'events' && method === 'POST') return insertRow(client, 'Event', body);
-  if (resource === 'events' && method === 'PATCH' && id) return updateRow(client, 'Event', id, body);
-  if (resource === 'schedules' && method === 'POST') return insertRow(client, 'Schedule', body);
-  if (resource === 'schedules' && method === 'PATCH' && id) return updateRow(client, 'Schedule', id, body);
-  if (resource === 'notification-preferences' && method === 'PUT') return upsertRow(client, 'NotificationPreference', body);
+  const isLeaderPlus = ['LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'].includes(role);
+  const isDisciplerPlus = ['DISCIPLER', 'PASTOR', 'ADMIN'].includes(role);
+  const isPastorPlus = ['PASTOR', 'ADMIN'].includes(role);
+
+  // Security: Server-side authorization check (Defense in Depth)
+  const checkAuth = (allowed) => {
+    if (!allowed) {
+      const error = new Error('Acesso negado. Permissões insuficientes.');
+      error.statusCode = 403;
+      throw error;
+    }
+  };
+
+  if (resource === 'people') {
+    checkAuth(isLeaderPlus);
+    if (method === 'POST') return insertRow(client, 'Person', body);
+    if (method === 'PATCH' && id) return updatePerson(client, id, body);
+  }
+
+  if (resource === 'cells') {
+    if (method === 'POST') {
+      checkAuth(isPastorPlus);
+      return insertRow(client, 'CellGroup', body);
+    }
+    if (method === 'PATCH' && id) {
+      checkAuth(isDisciplerPlus);
+      return updateRow(client, 'CellGroup', id, body);
+    }
+  }
+
+  if (resource === 'discipleship-pairs') {
+    checkAuth(isLeaderPlus);
+    if (method === 'POST') return insertRow(client, 'DiscipleshipPair', body);
+    if (method === 'PATCH' && id) return updateRow(client, 'DiscipleshipPair', id, body);
+  }
+
+  if (resource === 'follow-ups') {
+    checkAuth(isLeaderPlus);
+    if (method === 'POST') return insertRow(client, 'FollowUp', body);
+    if (method === 'PATCH' && id) return updateRow(client, 'FollowUp', id, body);
+  }
+
+  if (resource === 'families') {
+    checkAuth(isPastorPlus);
+    if (method === 'POST') return insertRow(client, 'Family', body);
+    if (method === 'PATCH' && id) return updateRow(client, 'Family', id, body);
+  }
+
+  if (resource === 'ministries') {
+    checkAuth(isPastorPlus);
+    if (method === 'POST') return insertRow(client, 'Ministry', body);
+    if (method === 'PATCH' && id) return updateRow(client, 'Ministry', id, body);
+  }
+
+  if (resource === 'events') {
+    checkAuth(isPastorPlus);
+    if (method === 'POST') return insertRow(client, 'Event', body);
+    if (method === 'PATCH' && id) return updateRow(client, 'Event', id, body);
+  }
+
+  if (resource === 'schedules') {
+    checkAuth(isPastorPlus);
+    if (method === 'POST') return insertRow(client, 'Schedule', body);
+    if (method === 'PATCH' && id) return updateRow(client, 'Schedule', id, body);
+  }
+
+  if (resource === 'notification-preferences' && method === 'PUT') {
+    return upsertRow(client, 'NotificationPreference', body);
+  }
 
   const error = new Error('Endpoint não encontrado.');
   error.statusCode = 404;
@@ -495,12 +547,14 @@ export async function handler(event) {
     }
 
     const body = event.body ? JSON.parse(event.body) : {};
-    await handleMutation(auth.client, method, path, body);
+    const authUser = await getAuthUser(auth.client, auth.user);
+    await handleMutation(auth.client, method, path, body, authUser.role);
     return json(200, { ok: true }, auth.cookies);
   } catch (error) {
     console.error(error);
-    return json(error.statusCode ?? 500, {
-      error: error.message ?? 'Erro interno.',
-    });
+    // Security: Secure error responses for 500 status codes (Defense in Depth)
+    const statusCode = error.statusCode ?? 500;
+    const message = statusCode === 500 ? 'Erro interno no servidor.' : (error.message ?? 'Erro interno.');
+    return json(statusCode, { error: message });
   }
 }
