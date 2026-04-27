@@ -3,6 +3,18 @@ import { createClient } from '@supabase/supabase-js';
 const ACCESS_COOKIE = 'rcp_access_token';
 const REFRESH_COOKIE = 'rcp_refresh_token';
 
+const RESOURCE_REQUIRED_ROLES = {
+  people: ['LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'],
+  cells: ['PASTOR', 'ADMIN'],
+  'discipleship-pairs': ['LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'],
+  'follow-ups': ['LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'],
+  families: ['PASTOR', 'ADMIN'],
+  ministries: ['PASTOR', 'ADMIN'],
+  events: ['PASTOR', 'ADMIN'],
+  schedules: ['PASTOR', 'ADMIN'],
+  'notification-preferences': ['MEMBER', 'LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'],
+};
+
 function requiredEnv(name) {
   const value = process.env[name];
   if (!value) throw new Error(`Missing server environment variable: ${name}`);
@@ -494,13 +506,25 @@ export async function handler(event) {
       return json(200, await getData(auth.client), auth.cookies);
     }
 
+    const authUser = await getAuthUser(auth.client, auth.user);
+
+    // Defense in Depth: Role-based access control for mutations
+    if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
+      const resource = path.split('/').filter(Boolean)[0];
+      const requiredRoles = RESOURCE_REQUIRED_ROLES[resource];
+
+      if (requiredRoles && !requiredRoles.includes(authUser.role)) {
+        return json(403, { error: 'Não tem permissão para realizar esta ação.' }, auth.cookies);
+      }
+    }
+
     const body = event.body ? JSON.parse(event.body) : {};
     await handleMutation(auth.client, method, path, body);
     return json(200, { ok: true }, auth.cookies);
   } catch (error) {
     console.error(error);
-    return json(error.statusCode ?? 500, {
-      error: error.message ?? 'Erro interno.',
-    });
+    const statusCode = error.statusCode ?? 500;
+    const message = statusCode === 500 ? 'Erro interno no servidor.' : (error.message ?? 'Erro interno.');
+    return json(statusCode, { error: message });
   }
 }
