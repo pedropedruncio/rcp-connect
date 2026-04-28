@@ -1,5 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { PAGE_ALLOWED_ROLES } from './hooks/usePermissions';
@@ -28,8 +29,9 @@ import Configuracoes   from './pages/Configuracoes';
  */
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
+    <>
+      <Routes>
+        <Route path="/login" element={<Login />} />
 
       {/* Container autenticado (qualquer role) */}
       <Route element={<ProtectedRoute />}>
@@ -106,7 +108,9 @@ export default function App() {
       </Route>
 
       {/* Qualquer rota desconhecida → home */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <SpeedInsights />
+    </>
   );
 }
