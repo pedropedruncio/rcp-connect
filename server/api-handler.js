@@ -632,6 +632,44 @@ export async function handler(event) {
       return json(200, { ok: true }, clearCookies());
     }
 
+    if (method === 'POST' && path === '/auth/signup') {
+      const { email, password, fullName } = JSON.parse(event.body ?? '{}');
+
+      if (!email || !password) {
+        return json(400, { error: 'Email e password são obrigatórios.' });
+      }
+
+      if (password.length < 8) {
+        return json(400, { error: 'A password deve ter pelo menos 8 caracteres.' });
+      }
+
+      const anon = createAnonClient();
+      const { data, error } = await anon.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: String(fullName ?? '').trim() || null },
+        },
+      });
+
+      if (error) {
+        return json(400, { error: error.message });
+      }
+
+      // Email confirmation required — session is null
+      if (!data.session || !data.user) {
+        return json(200, {
+          needsEmailConfirmation: true,
+          message: 'Conta criada! Verifique o seu email e clique no link de confirmação antes de entrar.',
+        });
+      }
+
+      // Session active — create Person + User automatically
+      const client = createUserClient(data.session.access_token);
+      const authUser = await getAuthUser(client, data.user);
+      return json(200, { session: toSessionPayload(data.user), user: authUser }, sessionCookies(data.session));
+    }
+
     if (method === 'POST' && path === '/auth/onboarding') {
       const auth = await getAuthedContext(event);
       if (!auth) return json(401, { error: 'Sessão expirada. Entre novamente.' }, clearCookies());

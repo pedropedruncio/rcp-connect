@@ -39,6 +39,11 @@ interface AuthContextType {
   needsOnboarding: boolean;
   signInWithPassword: (email: string, password: string) => Promise<any>;
   signInWithGoogle: () => Promise<any>;
+  signUpWithPassword: (email: string, password: string, fullName: string) => Promise<{
+    data: any;
+    error: any | null;
+    needsEmailConfirmation: boolean;
+  }>;
   completeOnboarding: (data: {
     firstName: string;
     lastName: string;
@@ -114,6 +119,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const signUpWithPassword = async (email: string, password: string, fullName: string) => {
+    try {
+      const data = await apiRequest<AuthResponse & { needsEmailConfirmation?: boolean; message?: string }>('/auth/signup', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, fullName }),
+      });
+
+      if (data.needsEmailConfirmation) {
+        return { data, error: null, needsEmailConfirmation: true };
+      }
+
+      setSession(data.session);
+      setUser(data.user);
+      return { data, error: null, needsEmailConfirmation: false };
+    } catch (error) {
+      return { data: null, error, needsEmailConfirmation: false };
+    }
+  };
+
   const completeOnboarding = async (data: {
     firstName: string;
     lastName: string;
@@ -156,6 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         needsOnboarding: user?.needsOnboarding ?? false,
         signInWithPassword,
         signInWithGoogle,
+        signUpWithPassword,
         completeOnboarding,
         logout,
       }}

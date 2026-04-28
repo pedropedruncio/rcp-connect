@@ -36,8 +36,11 @@ describe('ProtectedRoute', () => {
       isAuthenticated: false,
       isLoading: false,
       isGoogleAuthEnabled: false,
+      needsOnboarding: false,
       signInWithPassword: vi.fn(),
       signInWithGoogle: vi.fn(),
+      signUpWithPassword: vi.fn(),
+      completeOnboarding: vi.fn(),
       logout: vi.fn(),
     });
 
@@ -56,6 +59,7 @@ describe('ProtectedRoute', () => {
         campus: 'Lisboa',
         cellId: null,
         avatarUrl: null,
+        needsOnboarding: false,
         supervisedCellIds: [],
         memberIds: [],
         leaderPersonIds: [],
@@ -64,8 +68,11 @@ describe('ProtectedRoute', () => {
       isAuthenticated: true,
       isLoading: false,
       isGoogleAuthEnabled: false,
+      needsOnboarding: false,
       signInWithPassword: vi.fn(),
       signInWithGoogle: vi.fn(),
+      signUpWithPassword: vi.fn(),
+      completeOnboarding: vi.fn(),
       logout: vi.fn(),
     });
 
