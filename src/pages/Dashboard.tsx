@@ -179,59 +179,63 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div className="card-heritage p-6">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="rounded-lg bg-green-50 p-2.5">
-                <TrendingUp className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">Saúde da rede</h3>
-                <p className="text-sm text-slate-500">Indicadores simples derivados das células atuais.</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              {[
-                { label: 'Células excelentes', value: scopedCells.filter((cell) => cell.health === 'EXCELENTE').length },
-                { label: 'Células estáveis', value: scopedCells.filter((cell) => cell.health === 'ESTÁVEL').length },
-                { label: 'Precisam atenção', value: scopedCells.filter((cell) => cell.health === 'ATENÇÃO').length },
-              ].map((item) => (
-                <div key={item.label} className="rounded-lg border border-outline-variant bg-surface-container-high p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{item.label}</p>
-                  <p className="mt-2 text-2xl font-bold text-slate-900">{item.value}</p>
+          {user?.role !== 'MEMBER' && (
+            <div className="card-heritage p-6">
+              <div className="mb-5 flex items-center gap-3">
+                <div className="rounded-lg bg-green-50 p-2.5">
+                  <TrendingUp className="h-5 w-5 text-green-600" />
                 </div>
-              ))}
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Saúde da rede</h3>
+                  <p className="text-sm text-slate-500">Indicadores simples derivados das células atuais.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                {[
+                  { label: 'Células excelentes', value: scopedCells.filter((cell) => cell.health === 'EXCELENTE').length },
+                  { label: 'Células estáveis', value: scopedCells.filter((cell) => cell.health === 'ESTÁVEL').length },
+                  { label: 'Precisam atenção', value: scopedCells.filter((cell) => cell.health === 'ATENÇÃO').length },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-lg border border-outline-variant bg-surface-container-high p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{item.label}</p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">{item.value}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="space-y-8 lg:col-span-4">
-          <div className="card-heritage p-6">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="rounded-lg bg-red-50 p-2.5">
-                <AlertTriangle className="h-5 w-5 text-red-500" />
+          {user?.role !== 'MEMBER' && (
+            <div className="card-heritage p-6">
+              <div className="mb-5 flex items-center gap-3">
+                <div className="rounded-lg bg-red-50 p-2.5">
+                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Itens que pedem ação</h3>
+                  <p className="text-sm text-slate-500">Pendências reais do seu âmbito.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">Itens que pedem ação</h3>
-                <p className="text-sm text-slate-500">Pendências reais do seu âmbito.</p>
-              </div>
-            </div>
 
-            <div className="space-y-3">
-              <div className="rounded-lg border border-outline-variant bg-surface-container-high p-4">
-                <p className="text-sm font-bold text-slate-800">Acompanhamentos pendentes</p>
-                <p className="text-xs text-slate-500">{scopedFollowUps.filter((item) => item.status === 'Pendente').length} registos aguardam ação.</p>
-              </div>
-              <div className="rounded-lg border border-outline-variant bg-surface-container-high p-4">
-                <p className="text-sm font-bold text-slate-800">Pessoas sem célula</p>
-                <p className="text-xs text-slate-500">{scopedPeople.filter((person) => !person.cellId).length} pessoas ainda não estão ligadas a uma célula.</p>
-              </div>
-              <div className="rounded-lg border border-outline-variant bg-surface-container-high p-4">
-                <p className="text-sm font-bold text-slate-800">Discipulado em curso</p>
-                <p className="text-xs text-slate-500">{scopedPairs.filter((pair) => pair.progress < 100).length} pares precisam de continuidade.</p>
+              <div className="space-y-3">
+                <div className="rounded-lg border border-outline-variant bg-surface-container-high p-4">
+                  <p className="text-sm font-bold text-slate-800">Acompanhamentos pendentes</p>
+                  <p className="text-xs text-slate-500">{scopedFollowUps.filter((item) => item.status === 'Pendente').length} registos aguardam ação.</p>
+                </div>
+                <div className="rounded-lg border border-outline-variant bg-surface-container-high p-4">
+                  <p className="text-sm font-bold text-slate-800">Pessoas sem célula</p>
+                  <p className="text-xs text-slate-500">{scopedPeople.filter((person) => !person.cellId).length} pessoas ainda não estão ligadas a uma célula.</p>
+                </div>
+                <div className="rounded-lg border border-outline-variant bg-surface-container-high p-4">
+                  <p className="text-sm font-bold text-slate-800">Discipulado em curso</p>
+                  <p className="text-xs text-slate-500">{scopedPairs.filter((pair) => pair.progress < 100).length} pares precisam de continuidade.</p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div className="card-heritage p-6">
             <div className="mb-4 flex items-center gap-3">
