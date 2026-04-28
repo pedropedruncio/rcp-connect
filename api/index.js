@@ -17,6 +17,25 @@ function normalizePath(request) {
   return url.pathname;
 }
 
+function normalizeQuery(request) {
+  const protocol = request.headers['x-forwarded-proto'] ?? 'https';
+  const host = request.headers.host ?? 'localhost';
+  const url = new URL(request.url ?? '/', `${protocol}://${host}`);
+  const query = {};
+
+  url.searchParams.forEach((value, key) => {
+    query[key] = value;
+  });
+
+  Object.entries(request.query ?? {}).forEach(([key, value]) => {
+    if (key !== 'path') {
+      query[key] = value;
+    }
+  });
+
+  return query;
+}
+
 function buildEvent(request) {
   const body =
     typeof request.body === 'string'
@@ -28,6 +47,7 @@ function buildEvent(request) {
   return {
     httpMethod: request.method,
     path: normalizePath(request),
+    queryStringParameters: normalizeQuery(request),
     headers: request.headers ?? {},
     body,
   };

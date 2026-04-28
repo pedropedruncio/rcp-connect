@@ -243,13 +243,13 @@ export default function Configuracoes() {
               <motion.div key="credenciais" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="card-heritage p-6">
                 <div className="border-b border-outline-variant pb-4">
                   <h3 className="text-lg font-bold text-slate-900">Credenciais</h3>
-                  <p className="text-sm text-slate-500">O acesso v1 está limitado a magic link e Google OAuth.</p>
+                  <p className="text-sm text-slate-500">O acesso v1 usa email/password e Google OAuth via API privada.</p>
                 </div>
 
                 <div className="mt-6 space-y-3 text-sm text-slate-600">
                   <p>Email: {user.email}</p>
                   <p>Provider principal: Supabase Auth</p>
-                  <p>OAuth ativo no frontend: Google</p>
+                  <p>OAuth ativo: Google com callback em /api/auth/callback</p>
                 </div>
               </motion.div>
             )}

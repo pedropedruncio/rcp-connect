@@ -155,8 +155,17 @@ site_url = "https://rcp-connect-web-pedro.netlify.app"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
 additional_redirect_urls = [
   "https://rcp-connect-web-pedro.netlify.app",
+  "https://rcp-connect-web-pedro.netlify.app/api/auth/callback",
+  "https://rcp-connect.vercel.app",
+  "https://rcp-connect.vercel.app/api/auth/callback",
+  "https://rcp-connect-pedroribeiroshe-9737s-projects.vercel.app",
+  "https://rcp-connect-pedroribeiroshe-9737s-projects.vercel.app/api/auth/callback",
+  "https://rcp-connect-pedroribeiroshe-9737-pedroribeiroshe-9737s-projects.vercel.app",
+  "https://rcp-connect-pedroribeiroshe-9737-pedroribeiroshe-9737s-projects.vercel.app/api/auth/callback",
   "http://localhost:3000",
+  "http://localhost:3000/api/auth/callback",
   "http://127.0.0.1:3000",
+  "http://127.0.0.1:3000/api/auth/callback",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600

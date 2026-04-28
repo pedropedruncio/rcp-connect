@@ -5,6 +5,7 @@ Aplicação React/Vite do RCP Connect com Supabase remoto como backend principal
 ## Produção
 
 - Frontend: `https://rcp-connect-web-pedro.netlify.app`
+- Vercel: `https://rcp-connect.vercel.app`
 - Supabase: configurado por variáveis de ambiente, sem project ref publicado no repositório
 
 ## Setup
@@ -14,15 +15,20 @@ Aplicação React/Vite do RCP Connect com Supabase remoto como backend principal
 3. Preencha:
    `SUPABASE_URL`
    `SUPABASE_ANON_KEY`
+   `VITE_ENABLE_GOOGLE_AUTH`
 4. Rode com Netlify Functions para que o browser use `/api/*`:
    `npx netlify dev`
 
 ## Fluxo de Auth
 
-- Magic link por email
 - Email/password pelo endpoint serverless `/api/auth/login`
+- Google OAuth pelo endpoint serverless `/api/auth/google`, com callback em `/api/auth/callback`
 - A sessão fica em cookies `HttpOnly`, sem tokens Supabase acessíveis ao JavaScript do browser
 - Primeiro acesso cria `Person` e `User` automaticamente com role inicial `MEMBER`
+
+## Redirects de OAuth
+
+No Supabase Auth, use um domínio estável na allowlist, como `https://rcp-connect.vercel.app/api/auth/callback` ou `https://rcp-connect-web-pedro.netlify.app/api/auth/callback`. Evite URLs de deploy com hash da Vercel, porque elas podem deixar de existir e causar `DEPLOYMENT_NOT_FOUND` após o login Google.
 
 ## Validação
 

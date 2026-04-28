@@ -2,6 +2,9 @@ import { createClient } from '@supabase/supabase-js';
 
 const ACCESS_COOKIE = 'rcp_access_token';
 const REFRESH_COOKIE = 'rcp_refresh_token';
+const OAUTH_COOKIE_PREFIX = 'rcp_oauth_';
+const OAUTH_RETURN_COOKIE = 'rcp_oauth_return_to';
+const OAUTH_COOKIE_MAX_AGE = 5 * 60;
 
 function requiredEnv(name) {
   const value = process.env[name];
@@ -22,6 +25,76 @@ function createAnonClient() {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
+    },
+  });
+}
+
+function getHeader(event, name) {
+  return event.headers?.[name] ?? event.headers?.[name.toLowerCase()] ?? event.headers?.[name.toUpperCase()];
+}
+
+function normalizeForwardedValue(value) {
+  return Array.isArray(value) ? value[0] : String(value ?? '').split(',')[0].trim();
+}
+
+function getRequestOrigin(event) {
+  const host = normalizeForwardedValue(getHeader(event, 'x-forwarded-host') ?? getHeader(event, 'host')) || 'localhost:3000';
+  const forwardedProto = normalizeForwardedValue(getHeader(event, 'x-forwarded-proto'));
+  const protocol = forwardedProto || (host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
+
+  return `${protocol}://${host}`;
+}
+
+function safeReturnTo(value) {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
+    return '/';
+  }
+
+  return value;
+}
+
+function serializeCookie(name, value, maxAge, sameSite = 'Strict') {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  return `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; HttpOnly${secure}; SameSite=${sameSite}`;
+}
+
+function oauthStorageCookieName(key) {
+  return `${OAUTH_COOKIE_PREFIX}${Buffer.from(key).toString('base64url')}`;
+}
+
+function clearOAuthCookies(event) {
+  const cookies = parseCookies(getHeader(event, 'cookie') ?? '');
+
+  return Object.keys(cookies)
+    .filter((name) => name.startsWith(OAUTH_COOKIE_PREFIX) || name === OAUTH_RETURN_COOKIE)
+    .map((name) => serializeCookie(name, '', 0, 'Lax'));
+}
+
+function createOAuthStorage(event, pendingCookies) {
+  const requestCookies = parseCookies(getHeader(event, 'cookie') ?? '');
+
+  return {
+    getItem(key) {
+      return requestCookies[oauthStorageCookieName(key)] ?? null;
+    },
+    setItem(key, value) {
+      pendingCookies.push(serializeCookie(oauthStorageCookieName(key), value, OAUTH_COOKIE_MAX_AGE, 'Lax'));
+    },
+    removeItem(key) {
+      pendingCookies.push(serializeCookie(oauthStorageCookieName(key), '', 0, 'Lax'));
+    },
+  };
+}
+
+function createOAuthClient(event, pendingCookies) {
+  const { url, anonKey } = getSupabaseConfig();
+  return createClient(url, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      flowType: 'pkce',
+      persistSession: true,
+      storage: createOAuthStorage(event, pendingCookies),
     },
   });
 }
@@ -57,20 +130,17 @@ function parseCookies(header = '') {
 function sessionCookies(session) {
   const accessMaxAge = Math.max(60, session.expires_in ?? 3600);
   const refreshMaxAge = 60 * 60 * 24 * 30;
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
 
   return [
-    `${ACCESS_COOKIE}=${encodeURIComponent(session.access_token)}; Path=/; Max-Age=${accessMaxAge}; HttpOnly${secure}; SameSite=Strict`,
-    `${REFRESH_COOKIE}=${encodeURIComponent(session.refresh_token)}; Path=/; Max-Age=${refreshMaxAge}; HttpOnly${secure}; SameSite=Strict`,
+    serializeCookie(ACCESS_COOKIE, session.access_token, accessMaxAge, 'Lax'),
+    serializeCookie(REFRESH_COOKIE, session.refresh_token, refreshMaxAge, 'Lax'),
   ];
 }
 
 function clearCookies() {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-
   return [
-    `${ACCESS_COOKIE}=; Path=/; Max-Age=0; HttpOnly${secure}; SameSite=Strict`,
-    `${REFRESH_COOKIE}=; Path=/; Max-Age=0; HttpOnly${secure}; SameSite=Strict`,
+    serializeCookie(ACCESS_COOKIE, '', 0, 'Lax'),
+    serializeCookie(REFRESH_COOKIE, '', 0, 'Lax'),
   ];
 }
 
@@ -91,6 +161,33 @@ function json(statusCode, body, cookies = []) {
   }
 
   return response;
+}
+
+function redirect(location, cookies = []) {
+  const response = {
+    statusCode: 302,
+    headers: {
+      'Cache-Control': 'no-store',
+      Location: location,
+    },
+    body: '',
+  };
+
+  if (cookies.length > 0) {
+    response.multiValueHeaders = {
+      'Set-Cookie': cookies,
+    };
+  }
+
+  return response;
+}
+
+function firstQueryValue(value) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function authErrorRedirect(message, cookies = []) {
+  return redirect(`/login?auth_error=${encodeURIComponent(message)}`, cookies);
 }
 
 function getPath(event) {
@@ -145,6 +242,9 @@ async function getAuthedContext(event) {
 function authUserFromProfile(profile, scope, sbUser) {
   const firstName = profile.Person?.firstName ?? sbUser.user_metadata?.full_name ?? 'Utilizador';
   const lastName = profile.Person?.lastName ?? '';
+  const phone = profile.Person?.phone ?? null;
+  const address = profile.Person?.address ?? null;
+  const needsOnboarding = !phone || !address;
 
   return {
     id: profile.Person?.id ?? profile.personId,
@@ -158,6 +258,7 @@ function authUserFromProfile(profile, scope, sbUser) {
     supervisedCellIds: scope.supervisedCellIds,
     memberIds: scope.memberIds,
     leaderPersonIds: scope.leaderPersonIds,
+    needsOnboarding,
   };
 }
 
@@ -285,6 +386,8 @@ async function getAuthUser(client, sbUser) {
         id,
         firstName,
         lastName,
+        phone,
+        address,
         campusId,
         cellGroupId,
         Campus ( name )
@@ -336,8 +439,8 @@ async function getData(client) {
     preferencesResult,
     settingsResult,
   ] = await Promise.all([
-    client.from('Campus').select('id, name, createdAt').order('name'),
-    client.from('Role').select('id, name, description, createdAt').order('name'),
+    client.from('Campus').select('id, name').order('name'),
+    client.from('Role').select('id, name, description').order('name'),
     client.from('User').select('id, email, personId, roleId, supabaseId, createdAt'),
     client.from('Person').select('id, firstName, lastName, email, phone, address, birthdate, notes, avatarUrl, status, campusId, cellGroupId'),
     client.from('CellGroup').select('id, name, leaderId, day, time, location, campusId, health'),
@@ -473,8 +576,138 @@ export async function handler(event) {
       return json(200, { session: toSessionPayload(data.user), user: authUser }, sessionCookies(data.session));
     }
 
+    if (method === 'POST' && path === '/auth/google') {
+      const { returnTo } = JSON.parse(event.body ?? '{}');
+      const cookies = [
+        serializeCookie(OAUTH_RETURN_COOKIE, safeReturnTo(returnTo), OAUTH_COOKIE_MAX_AGE, 'Lax'),
+      ];
+      const anon = createOAuthClient(event, cookies);
+      const redirectTo = `${getRequestOrigin(event)}/api/auth/callback`;
+      const { data, error } = await anon.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          queryParams: {
+            prompt: 'select_account',
+          },
+        },
+      });
+
+      if (error || !data?.url) {
+        return json(500, { error: error?.message ?? 'Não foi possível iniciar o login com Google.' }, cookies);
+      }
+
+      return json(200, { url: data.url }, cookies);
+    }
+
+    if (method === 'GET' && path === '/auth/callback') {
+      const query = event.queryStringParameters ?? {};
+      const code = firstQueryValue(query.code);
+      const providerError = firstQueryValue(query.error_description ?? query.error);
+      const requestCookies = parseCookies(getHeader(event, 'cookie') ?? '');
+      const returnTo = safeReturnTo(requestCookies[OAUTH_RETURN_COOKIE] ?? '/');
+      const cookies = clearOAuthCookies(event);
+
+      if (providerError) {
+        return authErrorRedirect(providerError, cookies);
+      }
+
+      if (!code) {
+        return authErrorRedirect('Callback do Google sem código de autenticação.', cookies);
+      }
+
+      const anon = createOAuthClient(event, cookies);
+      const { data, error } = await anon.auth.exchangeCodeForSession(code);
+
+      if (error || !data.session || !data.user) {
+        return authErrorRedirect(error?.message ?? 'Não foi possível concluir o login com Google.', cookies);
+      }
+
+      const client = createUserClient(data.session.access_token);
+      await getAuthUser(client, data.user);
+      return redirect(returnTo, [...cookies, ...sessionCookies(data.session)]);
+    }
+
     if (method === 'POST' && path === '/auth/logout') {
       return json(200, { ok: true }, clearCookies());
+    }
+
+    if (method === 'POST' && path === '/auth/onboarding') {
+      const auth = await getAuthedContext(event);
+      if (!auth) return json(401, { error: 'Sessão expirada. Entre novamente.' }, clearCookies());
+
+      const { firstName, lastName, phone, address, birthdate, campusId } = JSON.parse(event.body ?? '{}');
+
+      if (!phone || !address) {
+        return json(400, { error: 'Telefone e morada são obrigatórios.' });
+      }
+
+      // Fetch the user profile to get their personId
+      const { data: userRow, error: userError } = await auth.client
+        .from('User')
+        .select('personId, email, Person(firstName, lastName, Campus(name))')
+        .eq('supabaseId', auth.user.id)
+        .single();
+
+      if (userError || !userRow) {
+        return json(500, { error: 'Perfil não encontrado.' });
+      }
+
+      // Update Person record
+      const updatePayload = {
+        phone,
+        address,
+        status: 'MEMBRO',
+        ...(firstName && { firstName }),
+        ...(lastName && { lastName }),
+        ...(birthdate && { birthdate }),
+        ...(campusId && { campusId }),
+      };
+
+      const { error: updateError } = await auth.client
+        .from('Person')
+        .update(updatePayload)
+        .eq('id', userRow.personId);
+
+      if (updateError) throw updateError;
+
+      // Update Supabase Auth to include the phone number
+      if (phone) {
+        // This will update the user's phone in auth.users
+        await auth.client.auth.updateUser({ phone });
+        // Optionally update user_metadata too so it's visible in JSON
+        await auth.client.auth.updateUser({ data: { phone } });
+      }
+
+      // Create SystemNotification for leadership (non-fatal if table not yet created)
+      const campusName = userRow.Person?.Campus?.name ?? 'Sem campus';
+      const memberName = `${firstName ?? userRow.Person?.firstName ?? ''} ${lastName ?? userRow.Person?.lastName ?? ''}`.trim();
+
+      try {
+        const { error: notifError } = await auth.client
+          .from('SystemNotification')
+          .insert({
+            id: `notif_${crypto.randomUUID()}`,
+            type: 'NEW_MEMBER_REGISTERED',
+            content: {
+              personId: userRow.personId,
+              name: memberName,
+              email: userRow.email,
+              phone,
+              campus: campusName,
+              registeredAt: new Date().toISOString(),
+            },
+          });
+        if (notifError) {
+          console.warn('[onboarding] SystemNotification insert failed (table may not exist yet):', notifError.message);
+        }
+      } catch (notifErr) {
+        console.warn('[onboarding] SystemNotification insert error:', notifErr);
+      }
+
+      // Re-fetch updated user
+      const authUser = await getAuthUser(auth.client, auth.user);
+      return json(200, { ok: true, user: authUser }, auth.cookies);
     }
 
     const auth = await getAuthedContext(event);

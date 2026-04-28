@@ -15,6 +15,7 @@ export interface AuthUser {
   supervisedCellIds: string[];
   memberIds: string[];
   leaderPersonIds: string[];
+  needsOnboarding: boolean;
 }
 
 export interface AuthSession {
@@ -35,12 +36,22 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   isGoogleAuthEnabled: boolean;
+  needsOnboarding: boolean;
   signInWithPassword: (email: string, password: string) => Promise<any>;
   signInWithGoogle: () => Promise<any>;
+  completeOnboarding: (data: {
+    firstName: string;
+    lastName: string;
+    phone: string;
+    address: string;
+    birthdate?: string;
+    campusId?: string;
+  }) => Promise<{ error: any | null }>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+const googleAuthEnabled = import.meta.env.VITE_ENABLE_GOOGLE_AUTH === 'true';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -82,11 +93,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signInWithGoogle = () =>
-    Promise.resolve({
-      data: { provider: 'google', url: null },
-      error: new Error('Login com Google indisponivel no modo de API privada.'),
-    });
+  const signInWithGoogle = async () => {
+    if (!googleAuthEnabled) {
+      return {
+        data: { provider: 'google', url: null },
+        error: new Error('Login com Google indisponível neste ambiente.'),
+      };
+    }
+
+    try {
+      const data = await apiRequest<{ url: string }>('/auth/google', {
+        method: 'POST',
+        body: JSON.stringify({ returnTo: '/' }),
+      });
+
+      window.location.assign(data.url);
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  };
+
+  const completeOnboarding = async (data: {
+    firstName: string;
+    lastName: string;
+    phone: string;
+    address: string;
+    birthdate?: string;
+    campusId?: string;
+  }) => {
+    try {
+      const result = await apiRequest<{ ok: boolean; user: AuthUser }>('/auth/onboarding', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      if (result.user) {
+        setUser(result.user);
+      }
+      return { error: null };
+    } catch (error) {
+      return { error };
+    }
+  };
 
   const logout = async () => {
     try {
@@ -104,9 +152,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         isAuthenticated: user !== null,
         isLoading,
-        isGoogleAuthEnabled: false,
+        isGoogleAuthEnabled: googleAuthEnabled,
+        needsOnboarding: user?.needsOnboarding ?? false,
         signInWithPassword,
         signInWithGoogle,
+        completeOnboarding,
         logout,
       }}
     >

@@ -7,7 +7,7 @@ test('mostra a página de login em produção web', async ({ page }) => {
 
   await expect(page).toHaveTitle(/RCP Connect/);
   await expect(page.getByRole('heading', { name: 'Iniciar Sessão' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Receber link mágico/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Iniciar Sessão/i })).toBeVisible();
 
   const googleButton = page.getByRole('button', { name: /Continuar com Google/i });
 

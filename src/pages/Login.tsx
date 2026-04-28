@@ -18,6 +18,15 @@ export default function Login() {
     }
   }, [isAuthenticated, isLoading, navigate]);
 
+  React.useEffect(() => {
+    const authError = new URLSearchParams(window.location.search).get('auth_error');
+
+    if (authError) {
+      setFeedback(authError);
+      window.history.replaceState(null, '', '/login');
+    }
+  }, []);
+
   const handleEmailLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 

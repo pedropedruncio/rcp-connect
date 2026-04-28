@@ -6,6 +6,9 @@ import { PAGE_ALLOWED_ROLES } from './hooks/usePermissions';
 
 import Dashboard       from './pages/Dashboard';
 import Login           from './pages/Login';
+import Onboarding      from './pages/Onboarding';
+import Visitantes      from './pages/Visitantes';
+import CompletarPerfil from './pages/CompletarPerfil';
 import MeuPerfil       from './pages/MeuPerfil';
 import MinhaAgenda     from './pages/MinhaAgenda';
 import Pessoas         from './pages/Pessoas';
@@ -30,9 +33,13 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-
+      <Route path="/visitantes" element={<Visitantes />} />
+      <Route path="/onboarding" element={<Onboarding />} />
       {/* Container autenticado (qualquer role) */}
       <Route element={<ProtectedRoute />}>
+        {/* Completar Perfil — ecrã inteiro, fora do Layout */}
+        <Route path="/completar-perfil" element={<CompletarPerfil />} />
+
         <Route path="/" element={<Layout />}>
 
           {/* Dashboard — todos os roles */}
