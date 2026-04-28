@@ -5,6 +5,7 @@ import {
   LoaderCircle, AlertCircle, ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useData } from '../contexts/DataContext';
 
 const LS_KEY = 'rcp_onboarding_draft';
 
@@ -16,6 +17,7 @@ interface Campus {
 export default function CompletarPerfil() {
   const navigate = useNavigate();
   const { user, completeOnboarding, needsOnboarding } = useAuth();
+  const { refetch } = useData();
   const [campuses, setCampuses] = useState<Campus[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +87,7 @@ export default function CompletarPerfil() {
     if (err) {
       setError(typeof err === 'string' ? err : (err as any)?.message ?? 'Erro ao guardar perfil.');
     } else {
+      await refetch();
       setHasSubmitted(true);
     }
   };
