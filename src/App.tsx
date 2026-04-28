@@ -1,5 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { PAGE_ALLOWED_ROLES } from './hooks/usePermissions';
@@ -28,7 +29,8 @@ import Configuracoes   from './pages/Configuracoes';
  */
 export default function App() {
   return (
-    <Routes>
+    <>
+      <Routes>
       <Route path="/login" element={<Login />} />
 
       {/* Container autenticado (qualquer role) */}
@@ -107,6 +109,8 @@ export default function App() {
 
       {/* Qualquer rota desconhecida → home */}
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+      <Analytics />
+    </>
   );
 }
