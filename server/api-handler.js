@@ -3,6 +3,44 @@ import { createClient } from '@supabase/supabase-js';
 const ACCESS_COOKIE = 'rcp_access_token';
 const REFRESH_COOKIE = 'rcp_refresh_token';
 
+const RESOURCE_REQUIRED_ROLES = {
+  'people': {
+    'POST': ['LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'],
+    'PATCH': ['LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'],
+  },
+  'cells': {
+    'POST': ['PASTOR', 'ADMIN'],
+    'PATCH': ['LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'],
+  },
+  'discipleship-pairs': {
+    'POST': ['LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'],
+    'PATCH': ['LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'],
+  },
+  'follow-ups': {
+    'POST': ['LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'],
+    'PATCH': ['LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'],
+  },
+  'families': {
+    'POST': ['PASTOR', 'ADMIN'],
+    'PATCH': ['PASTOR', 'ADMIN'],
+  },
+  'ministries': {
+    'POST': ['PASTOR', 'ADMIN'],
+    'PATCH': ['PASTOR', 'ADMIN'],
+  },
+  'events': {
+    'POST': ['PASTOR', 'ADMIN'],
+    'PATCH': ['PASTOR', 'ADMIN'],
+  },
+  'schedules': {
+    'POST': ['PASTOR', 'ADMIN'],
+    'PATCH': ['PASTOR', 'ADMIN'],
+  },
+  'notification-preferences': {
+    'PUT': ['MEMBER', 'LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'],
+  },
+};
+
 function requiredEnv(name) {
   const value = process.env[name];
   if (!value) throw new Error(`Missing server environment variable: ${name}`);
@@ -428,8 +466,17 @@ async function updatePerson(client, id, payload) {
   }
 }
 
-async function handleMutation(client, method, path, body) {
-  const [, resource, id] = path.split('/');
+async function handleMutation(client, method, path, body, user) {
+  const parts = path.split('/').filter(Boolean);
+  const resource = parts[0];
+  const id = parts[1];
+
+  const requiredRoles = RESOURCE_REQUIRED_ROLES[resource]?.[method] ?? ['ADMIN'];
+  if (!requiredRoles.includes(user.role)) {
+    const error = new Error('Você não tem permissão para realizar esta ação.');
+    error.statusCode = 403;
+    throw error;
+  }
 
   if (resource === 'people' && method === 'POST') return insertRow(client, 'Person', body);
   if (resource === 'people' && method === 'PATCH' && id) return updatePerson(client, id, body);
@@ -458,6 +505,7 @@ export async function handler(event) {
   try {
     const method = event.httpMethod;
     const path = getPath(event);
+    const isMutation = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method);
 
     if (method === 'POST' && path === '/auth/login') {
       const { email, password } = JSON.parse(event.body ?? '{}');
@@ -479,28 +527,36 @@ export async function handler(event) {
 
     const auth = await getAuthedContext(event);
 
-    if (method === 'GET' && path === '/auth/session') {
-      if (!auth) return json(200, { session: null, user: null }, clearCookies());
-
-      const authUser = await getAuthUser(auth.client, auth.user);
-      return json(200, { session: auth.session, user: authUser }, auth.cookies);
+    if (!auth) {
+      if (method === 'GET' && path === '/auth/session') {
+        return json(200, { session: null, user: null }, clearCookies());
+      }
+      return json(401, { error: 'Sessão expirada. Entre novamente.' }, clearCookies());
     }
 
-    if (!auth) {
-      return json(401, { error: 'Sessão expirada. Entre novamente.' }, clearCookies());
+    const authUser = await getAuthUser(auth.client, auth.user);
+
+    if (method === 'GET' && path === '/auth/session') {
+      return json(200, { session: auth.session, user: authUser }, auth.cookies);
     }
 
     if (method === 'GET' && path === '/data') {
       return json(200, await getData(auth.client), auth.cookies);
     }
 
-    const body = event.body ? JSON.parse(event.body) : {};
-    await handleMutation(auth.client, method, path, body);
-    return json(200, { ok: true }, auth.cookies);
+    if (isMutation) {
+      const body = event.body ? JSON.parse(event.body) : {};
+      await handleMutation(auth.client, method, path, body, authUser);
+      return json(200, { ok: true }, auth.cookies);
+    }
+
+    const error = new Error('Endpoint não encontrado.');
+    error.statusCode = 404;
+    throw error;
   } catch (error) {
     console.error(error);
-    return json(error.statusCode ?? 500, {
-      error: error.message ?? 'Erro interno.',
-    });
+    const statusCode = error.statusCode ?? 500;
+    const message = statusCode === 500 ? 'Erro interno no servidor.' : (error.message ?? 'Erro inesperado.');
+    return json(statusCode, { error: message });
   }
 }
