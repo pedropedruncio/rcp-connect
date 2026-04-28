@@ -105,6 +105,15 @@ export interface Family {
   memberIds: string[];
 }
 
+export interface FamilyMember {
+  id: string;
+  familyId: string;
+  personId: string;
+  relationship: string;
+  isPrimaryContact: boolean;
+  status: 'ACCEPTED' | 'PENDING' | 'REJECTED';
+}
+
 export interface Ministry {
   id: string;
   name: string;

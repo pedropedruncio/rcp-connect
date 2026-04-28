@@ -23,6 +23,7 @@ const CAN_VIEW_RELATORIOS: Role[]      = ['DISCIPLER', 'PASTOR', 'ADMIN'];
 const CAN_VIEW_CONFIGURACOES: Role[]   = ['ADMIN'];
 const CAN_VIEW_MEU_PERFIL: Role[]      = ['MEMBER'];
 const CAN_VIEW_AGENDA: Role[]          = ['MEMBER', 'LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'];
+const CAN_VIEW_MINHA_FAMILIA: Role[]   = ['MEMBER', 'LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'];
 
 /** Permissões de acção */
 const CAN_ADD_MEMBER: Role[]           = ['LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'];
@@ -49,6 +50,7 @@ export const PAGE_ALLOWED_ROLES: Record<string, Role[]> = {
   '/minha-agenda':    CAN_VIEW_AGENDA,
   '/pessoas':         CAN_VIEW_PESSOAS,
   '/familias':        CAN_VIEW_FAMILIAS,
+  '/familia':         CAN_VIEW_MINHA_FAMILIA,
   '/lideranca':       CAN_VIEW_LIDERANCA,
   '/celulas':         CAN_VIEW_CELULAS,
   '/ministerios':     CAN_VIEW_MINISTERIOS,
@@ -84,6 +86,7 @@ export function usePermissions() {
     canViewConfiguracoes:  has(CAN_VIEW_CONFIGURACOES),
     canViewMeuPerfil:      has(CAN_VIEW_MEU_PERFIL),
     canViewAgenda:         has(CAN_VIEW_AGENDA),
+    canViewMinhaFamilia:   has(CAN_VIEW_MINHA_FAMILIA),
 
     // ── Acções ───────────────────────────────────────────────────────────────
     canAddMember:          has(CAN_ADD_MEMBER),

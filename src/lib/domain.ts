@@ -6,6 +6,7 @@ import type {
   DiscipleshipPair,
   EventItem,
   Family,
+  FamilyMember,
   FollowUp,
   Ministry,
   NotificationPreference,
@@ -89,6 +90,7 @@ export interface DomainState {
   discipleshipPairs: DiscipleshipPair[];
   followUps: FollowUp[];
   families: Family[];
+  familyMembers: FamilyMember[];
   ministries: Ministry[];
   events: EventItem[];
   schedules: Schedule[];

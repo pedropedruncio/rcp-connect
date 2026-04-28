@@ -14,6 +14,7 @@ import MinhaAgenda     from './pages/MinhaAgenda';
 import Pessoas         from './pages/Pessoas';
 import PerfilPessoa    from './pages/PerfilPessoa';
 import Familias        from './pages/Familias';
+import Familia         from './pages/Familia';
 import Lideranca       from './pages/Lideranca';
 import Celulas         from './pages/Celulas';
 import Ministerios     from './pages/Ministerios';
@@ -64,6 +65,10 @@ export default function App() {
           {/* Famílias — PASTOR, ADMIN */}
           <Route element={<ProtectedRoute allowedRoles={PAGE_ALLOWED_ROLES['/familias']} />}>
             <Route path="familias" element={<Familias />} />
+          </Route>
+          
+          <Route element={<ProtectedRoute allowedRoles={PAGE_ALLOWED_ROLES['/familia']} />}>
+            <Route path="familia" element={<Familia />} />
           </Route>
 
           {/* Liderança — DISCIPLER+ */}

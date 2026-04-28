@@ -32,6 +32,7 @@ export default function Dashboard() {
     getCellByMemberId,
     isLoading,
     persons,
+    familyMembers,
   } = useData();
   const [isEventModalOpen, setEventModalOpen] = React.useState(false);
   const [toast, setToast] = React.useState<{ show: boolean; msg: string }>({ show: false, msg: '' });
@@ -71,6 +72,9 @@ export default function Dashboard() {
     .sort((left, right) => left.date.localeCompare(right.date))
     .slice(0, 5);
 
+  const myFamilies = familyMembers?.filter(m => m.personId === user?.id && m.status === 'ACCEPTED').map(m => m.familyId) ?? [];
+  const myFamilySize = familyMembers?.filter(m => myFamilies.includes(m.familyId) && m.status === 'ACCEPTED').length ?? 0;
+
   const cards = permissions.isGlobalScope
     ? [
         { label: 'Pessoas ativas', value: persons.filter((person) => person.status === 'MEMBRO').length, icon: Users },
@@ -78,12 +82,19 @@ export default function Dashboard() {
         { label: 'Em discipulado', value: discipleshipPairs.length, icon: BookOpen },
         { label: 'Acompanhamentos pendentes', value: followUps.filter((item) => item.status !== 'Concluído').length, icon: HeartHandshake },
       ]
-    : [
-        { label: 'Minha célula', value: myCell?.name ?? 'Sem célula', icon: Network },
-        { label: 'Pessoas no meu scope', value: scopedPeople.length, icon: Users },
-        { label: 'Discipulado ativo', value: scopedPairs.length, icon: BookOpen },
-        { label: 'Acompanhamentos abertos', value: scopedFollowUps.filter((item) => item.status !== 'Concluído').length, icon: HeartHandshake },
-      ];
+    : user?.role === 'MEMBER'
+      ? [
+          { label: 'Minha célula', value: myCell?.name ?? 'Sem célula', icon: Network },
+          { label: 'Membros da família', value: myFamilySize, icon: Users, onClick: () => navigate('/familia'), actionLabel: 'Gerir' },
+          { label: 'Discipulado ativo', value: scopedPairs.length, icon: BookOpen },
+          { label: 'Acompanhamentos abertos', value: scopedFollowUps.filter((item) => item.status !== 'Concluído').length, icon: HeartHandshake },
+        ]
+      : [
+          { label: 'Minha célula', value: myCell?.name ?? 'Sem célula', icon: Network },
+          { label: 'Pessoas no meu scope', value: scopedPeople.length, icon: Users },
+          { label: 'Discipulado ativo', value: scopedPairs.length, icon: BookOpen },
+          { label: 'Acompanhamentos abertos', value: scopedFollowUps.filter((item) => item.status !== 'Concluído').length, icon: HeartHandshake },
+        ];
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-8 p-8">
@@ -127,14 +138,24 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => (
-          <div key={card.label} className="card-heritage p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="rounded-md border border-outline-variant bg-surface p-2">
-                <card.icon className="h-5 w-5 text-gold" />
+          <div key={card.label} className="card-heritage p-6 relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="mb-4 flex items-center justify-between">
+                <div className="rounded-md border border-outline-variant bg-surface p-2">
+                  <card.icon className="h-5 w-5 text-gold" />
+                </div>
               </div>
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">{card.label}</p>
+              <h3 className="text-2xl font-bold text-slate-900">{card.value}</h3>
             </div>
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">{card.label}</p>
-            <h3 className="text-2xl font-bold text-slate-900">{card.value}</h3>
+            {card.onClick && (
+              <button 
+                onClick={card.onClick}
+                className="mt-4 text-xs font-semibold text-gold hover:text-gold-light text-left inline-flex items-center gap-1 transition-colors"
+              >
+                {card.actionLabel} →
+              </button>
+            )}
           </div>
         ))}
       </div>

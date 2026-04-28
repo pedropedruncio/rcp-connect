@@ -74,6 +74,9 @@ interface DataContextType extends DomainState {
   addSchedule: (schedule: ScheduleInput) => Promise<void>;
   updateSchedule: (id: string, data: Partial<ScheduleInput>) => Promise<void>;
   saveNotificationPreference: (preference: NotificationPreference) => Promise<void>;
+  inviteFamilyMember: (targetPersonId: string, relationship: string, familyId?: string) => Promise<void>;
+  acceptFamilyInvitation: (memberId: string) => Promise<void>;
+  rejectFamilyInvitation: (memberId: string) => Promise<void>;
 }
 
 type PersonRow = {
@@ -131,6 +134,15 @@ type FamilyRow = {
   name: string;
 };
 
+type FamilyMemberRow = {
+  id: string;
+  familyId: string;
+  personId: string;
+  relationship: string;
+  isPrimaryContact: boolean;
+  status: 'ACCEPTED' | 'PENDING' | 'REJECTED';
+};
+
 type MinistryRow = {
   id: string;
   name: string;
@@ -170,6 +182,7 @@ const EMPTY_STATE: DomainState = {
   discipleshipPairs: [],
   followUps: [],
   families: [],
+  familyMembers: [],
   ministries: [],
   events: [],
   schedules: [],
@@ -198,6 +211,7 @@ interface DataApiResponse {
   discipleshipPairs: PairRow[];
   followUps: FollowUpRow[];
   families: FamilyRow[];
+  familyMembers: FamilyMemberRow[];
   ministries: MinistryRow[];
   events: EventRow[];
   schedules: ScheduleRow[];
@@ -230,6 +244,7 @@ function mapDomainState(
   pairRows: PairRow[],
   followUpRows: FollowUpRow[],
   familyRows: FamilyRow[],
+  familyMemberRows: FamilyMemberRow[],
   ministryRows: MinistryRow[],
   eventRows: EventRow[],
   scheduleRows: ScheduleRow[],
@@ -305,7 +320,16 @@ function mapDomainState(
     campusId: null,
     campus: 'Sem campus',
     notes: '',
-    memberIds: [],
+    memberIds: familyMemberRows.filter(m => m.familyId === row.id && m.status === 'ACCEPTED').map(m => m.personId),
+  }));
+
+  const familyMembers = familyMemberRows.map((row) => ({
+    id: row.id,
+    familyId: row.familyId,
+    personId: row.personId,
+    relationship: row.relationship ?? 'Membro',
+    isPrimaryContact: row.isPrimaryContact ?? false,
+    status: row.status ?? 'PENDING',
   }));
 
   const ministries: Ministry[] = ministryRows.map((row) => ({
@@ -389,6 +413,7 @@ function mapDomainState(
     discipleshipPairs,
     followUps,
     families,
+    familyMembers,
     ministries,
     events,
     schedules,
@@ -398,7 +423,7 @@ function mapDomainState(
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const [state, setState] = useState<DomainState>(EMPTY_STATE);
   const [supports, setSupports] = useState<SchemaCapabilities>(DEFAULT_SUPPORTS);
   const [error, setError] = useState<string | null>(null);
@@ -431,6 +456,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           data.discipleshipPairs,
           data.followUps,
           data.families,
+          data.familyMembers || [],
           data.ministries,
           data.events,
           data.schedules,
@@ -743,6 +769,35 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await refetch();
   }, [refetch, supports.notificationPreferences]);
 
+  const inviteFamilyMember = useCallback(async (targetPersonId: string, relationship: string, familyId?: string) => {
+    await apiRequest('/family-members/invite', {
+      method: 'POST',
+      body: JSON.stringify({
+        personId: user?.id,
+        targetPersonId,
+        relationship,
+        familyId,
+      }),
+    });
+    await refetch();
+  }, [refetch, user]);
+
+  const acceptFamilyInvitation = useCallback(async (memberId: string) => {
+    await apiRequest('/family-members/accept', {
+      method: 'POST',
+      body: JSON.stringify({ memberId }),
+    });
+    await refetch();
+  }, [refetch]);
+
+  const rejectFamilyInvitation = useCallback(async (memberId: string) => {
+    await apiRequest('/family-members/reject', {
+      method: 'POST',
+      body: JSON.stringify({ memberId }),
+    });
+    await refetch();
+  }, [refetch]);
+
   const value = useMemo<DataContextType>(() => ({
     ...state,
     isLoading,
@@ -770,6 +825,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     addSchedule,
     updateSchedule,
     saveNotificationPreference,
+    inviteFamilyMember,
+    acceptFamilyInvitation,
+    rejectFamilyInvitation,
   }), [
     addCell,
     addDiscipleshipPair,
@@ -797,6 +855,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     updateMinistry,
     updatePerson,
     updateSchedule,
+    inviteFamilyMember,
+    acceptFamilyInvitation,
+    rejectFamilyInvitation,
   ]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

@@ -450,7 +450,7 @@ async function getData(client) {
     client.from('Ministry').select('id, name, description'),
     client.from('Event').select('id, name, description, date, campusId'),
     client.from('Schedule').select('id, ministryId, date, time, status'),
-    optionalSelect(client, 'FamilyMember', 'id'),
+    optionalSelect(client, 'FamilyMember', 'id, familyId, personId, relationship, isPrimaryContact, status'),
     optionalSelect(client, 'MinistryMember', 'id'),
     optionalSelect(client, 'EventRegistration', 'id'),
     optionalSelect(client, 'ScheduleAssignment', 'id'),
@@ -769,6 +769,114 @@ export async function handler(event) {
       const { data, error } = await auth.client.from('Campus').select('id, name').order('name');
       if (error) throw error;
       return json(200, data ?? [], auth.cookies);
+    }
+
+    if (method === 'POST' && path === '/family-members/invite') {
+      const body = event.body ? JSON.parse(event.body) : {};
+      const { personId, targetPersonId, relationship, familyId } = body;
+      
+      // Basic check
+      if (!personId || !targetPersonId || !relationship) {
+        return json(400, { error: 'Dados em falta.' }, auth.cookies);
+      }
+
+      // Check if target is already ACCEPTED in any family
+      const { data: existingTarget } = await auth.client
+        .from('FamilyMember')
+        .select('id')
+        .eq('personId', targetPersonId)
+        .eq('status', 'ACCEPTED');
+        
+      if (existingTarget && existingTarget.length > 0) {
+        return json(400, { error: 'Esta pessoa já pertence a um grupo familiar.' }, auth.cookies);
+      }
+      
+      // Determine familyId. If sender doesn't have a family, create one?
+      // Wait, let's assume familyId is provided.
+      let targetFamilyId = familyId;
+      if (!targetFamilyId) {
+        // Find if sender has a family
+        const { data: senderFam } = await auth.client
+          .from('FamilyMember')
+          .select('familyId')
+          .eq('personId', personId)
+          .eq('status', 'ACCEPTED')
+          .limit(1);
+          
+        if (senderFam && senderFam.length > 0) {
+          targetFamilyId = senderFam[0].familyId;
+        } else {
+          // Create a new family
+          const { data: newFam, error: famErr } = await auth.client
+            .from('Family')
+            .insert({ name: 'Família' }) // Or better name
+            .select('id')
+            .single();
+            
+          if (famErr) throw famErr;
+          targetFamilyId = newFam.id;
+          
+          // Add sender as ACCEPTED primary contact
+          await auth.client.from('FamilyMember').insert({
+            familyId: targetFamilyId,
+            personId: personId,
+            relationship: 'Titular',
+            isPrimaryContact: true,
+            status: 'ACCEPTED'
+          });
+        }
+      }
+
+      // Create the pending invitation
+      const { error: inviteErr } = await auth.client.from('FamilyMember').insert({
+        familyId: targetFamilyId,
+        personId: targetPersonId,
+        relationship: relationship,
+        isPrimaryContact: false,
+        status: 'PENDING'
+      });
+      
+      if (inviteErr) throw inviteErr;
+      
+      try {
+        await auth.client.from('SystemNotification').insert({
+          id: `notif_${crypto.randomUUID()}`,
+          type: 'FAMILY_INVITE',
+          content: { 
+            message: 'Recebeu um convite para integrar uma família.',
+            targetPersonId: targetPersonId 
+          },
+          readBy: []
+        });
+      } catch (notifErr) {
+        console.warn('[family-invite] SystemNotification insert error:', notifErr);
+      }
+      
+      return json(200, { ok: true, familyId: targetFamilyId }, auth.cookies);
+    }
+
+    if (method === 'POST' && path === '/family-members/accept') {
+      const { memberId } = event.body ? JSON.parse(event.body) : {};
+      const { error: updateErr } = await auth.client
+        .from('FamilyMember')
+        .update({ status: 'ACCEPTED' })
+        .eq('id', memberId)
+        .eq('personId', auth.user.id);
+        
+      if (updateErr) throw updateErr;
+      return json(200, { ok: true }, auth.cookies);
+    }
+    
+    if (method === 'POST' && path === '/family-members/reject') {
+      const { memberId } = event.body ? JSON.parse(event.body) : {};
+      const { error: delErr } = await auth.client
+        .from('FamilyMember')
+        .delete()
+        .eq('id', memberId)
+        .eq('personId', auth.user.id);
+        
+      if (delErr) throw delErr;
+      return json(200, { ok: true }, auth.cookies);
     }
 
     const body = event.body ? JSON.parse(event.body) : {};
