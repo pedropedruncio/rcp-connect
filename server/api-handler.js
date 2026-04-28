@@ -765,6 +765,12 @@ export async function handler(event) {
       return json(200, await getData(auth.client), auth.cookies);
     }
 
+    if (method === 'GET' && path === '/campuses') {
+      const { data, error } = await auth.client.from('Campus').select('id, name').order('name');
+      if (error) throw error;
+      return json(200, data ?? [], auth.cookies);
+    }
+
     const body = event.body ? JSON.parse(event.body) : {};
     await handleMutation(auth.client, method, path, body);
     return json(200, { ok: true }, auth.cookies);
