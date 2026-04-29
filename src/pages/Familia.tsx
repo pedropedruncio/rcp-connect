@@ -176,6 +176,8 @@ export default function Familia() {
                     <button 
                       onClick={() => handleReject(invite.id)}
                       className="btn-secondary-heritage p-2 text-red-600 hover:bg-red-50"
+                      title="Rejeitar convite"
+                      aria-label="Rejeitar convite"
                     >
                       <X className="h-4 w-4" />
                     </button>

@@ -157,8 +157,8 @@ export default function Login() {
     return (
       <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4">
         {/* Floating orbs */}
-        <div className="absolute top-1/4 left-1/6 w-80 h-80 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" style={{ animation: 'pulse 5s ease-in-out infinite' }} />
-        <div className="absolute bottom-1/4 right-1/6 w-96 h-96 rounded-full bg-emerald-500/8 blur-3xl pointer-events-none" style={{ animation: 'pulse 7s ease-in-out infinite' }} />
+        <div className="absolute top-1/4 left-1/6 w-80 h-80 rounded-full login-orb-1 pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/6 w-96 h-96 rounded-full login-orb-2 pointer-events-none" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-white/2 blur-3xl pointer-events-none" />
 
         {/* Logo top-left */}
@@ -170,19 +170,10 @@ export default function Login() {
         </div>
 
         {/* Card */}
-        <div
-          className="relative z-10 w-full max-w-md rounded-3xl p-8 text-center"
-          style={{
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03))',
-            backdropFilter: 'blur(24px)',
-            WebkitBackdropFilter: 'blur(24px)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            boxShadow: '0 32px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)',
-          }}
-        >
+        <div className="relative z-10 w-full max-w-md rounded-3xl p-8 text-center login-glass-card">
           {/* Icon with rings */}
           <div className="relative flex items-center justify-center mb-8">
-            <div className="absolute w-24 h-24 rounded-full bg-emerald-500/10 animate-ping" style={{ animationDuration: '2s' }} />
+            <div className="absolute w-24 h-24 rounded-full bg-emerald-500/10 animate-ping" />
             <div className="absolute w-20 h-20 rounded-full bg-emerald-500/15" />
             <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-xl shadow-emerald-500/30">
               <MailCheck className="w-8 h-8 text-white" />
@@ -201,7 +192,7 @@ export default function Login() {
               { step: '2', text: 'Clique no link de confirmação' },
               { step: '3', text: 'Volte aqui e inicie sessão' },
             ].map(({ step, text }) => (
-              <div key={step} className="flex items-center gap-3 rounded-xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div key={step} className="flex items-center gap-3 rounded-xl px-4 py-3 login-step-card">
                 <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold flex items-center justify-center flex-shrink-0">{step}</span>
                 <span className="text-white/70 text-sm">{text}</span>
               </div>
@@ -210,8 +201,7 @@ export default function Login() {
 
           <button
             onClick={() => { setEmailConfirmationSent(false); setMode('login'); setFeedback(null); }}
-            className="w-full py-3.5 rounded-xl font-semibold text-sm text-white transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
-            style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 8px 24px rgba(245,158,11,0.3)' }}
+            className="w-full py-3.5 rounded-xl font-semibold text-sm text-white transition-all duration-200 hover:opacity-90 active:scale-[0.98] login-btn-gradient"
           >
             Ir para o login
           </button>

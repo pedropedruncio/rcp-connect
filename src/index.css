@@ -65,4 +65,45 @@
   .badge-heritage {
     @apply px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider;
   }
+
+  /* Onboarding Background */
+  .onboarding-bg {
+    background-image: radial-gradient(circle at 60% 20%, #dbeafe 0%, transparent 50%), radial-gradient(circle at 20% 80%, #f0fdf4 0%, transparent 50%);
+  }
+
+  /* Login Background Orbs */
+  .login-orb-1 {
+    background-color: rgb(245 158 11 / 0.1);
+    filter: blur(64px);
+    animation: pulse 5s ease-in-out infinite;
+  }
+  
+  .login-orb-2 {
+    background-color: rgb(16 185 129 / 0.08);
+    filter: blur(64px);
+    animation: pulse 7s ease-in-out infinite;
+  }
+
+  .login-glass-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 32px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+  }
+
+  .login-step-card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .login-btn-gradient {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    box-shadow: 0 8px 24px rgba(245,158,11,0.3);
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+  }
 }

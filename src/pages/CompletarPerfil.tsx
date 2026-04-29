@@ -94,10 +94,7 @@ export default function CompletarPerfil() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 px-4 py-12">
-      <div
-        className="absolute inset-0 opacity-30"
-        style={{ backgroundImage: 'radial-gradient(circle at 60% 20%, #dbeafe 0%, transparent 50%), radial-gradient(circle at 20% 80%, #f0fdf4 0%, transparent 50%)' }}
-      />
+      <div className="absolute inset-0 opacity-30 onboarding-bg" />
 
       <div className="relative z-10 w-full max-w-lg">
         {/* Logo */}
@@ -193,30 +190,34 @@ export default function CompletarPerfil() {
             {/* Birthdate + Campus row */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
+                <label htmlFor="birthdate" className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
                   Data de nascimento
                 </label>
                 <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 focus-within:border-amber-400 focus-within:bg-white transition-colors">
                   <Calendar className="w-4 h-4 text-slate-300 shrink-0" />
                   <input
+                    id="birthdate"
                     type="date"
                     value={birthdate}
                     onChange={(e) => setBirthdate(e.target.value)}
                     max={new Date().toISOString().split('T')[0]}
                     className="w-full bg-transparent text-sm text-slate-700 outline-none"
+                    aria-label="Data de nascimento"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
+                <label htmlFor="campus" className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
                   Campus
                 </label>
                 <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 focus-within:border-amber-400 focus-within:bg-white transition-colors">
                   <Building2 className="w-4 h-4 text-slate-300 shrink-0" />
                   <select
+                    id="campus"
                     value={campusId}
                     onChange={(e) => setCampusId(e.target.value)}
                     className="w-full bg-transparent text-sm text-slate-700 outline-none"
+                    title="Selecionar Campus"
                   >
                     <option value="">Selecionar...</option>
                     {campuses.map((c) => (
