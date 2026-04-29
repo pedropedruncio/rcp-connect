@@ -41,34 +41,63 @@ export default function Dashboard() {
 
   const myCell = user ? getCellByMemberId(user.id) : undefined;
   const ledCell = user ? getCellByLeaderId(user.id) : undefined;
+  const dashboardCell = user?.role === 'LEADER' ? (ledCell ?? myCell) : myCell;
+
   const scopedCells =
     permissions.isGlobalScope
       ? cells
       : user?.role === 'LEADER'
         ? cells.filter((cell) => cell.leaderId === user.id)
         : user?.role === 'DISCIPLER'
-          ? cells.filter((cell) => user.supervisedCellIds.includes(cell.id))
+          ? cells.filter((cell) => user.supervisedCellIds?.includes(cell.id))
           : myCell
             ? [myCell]
             : [];
-  const scopedPeople =
-    permissions.isGlobalScope
-      ? persons
-      : user?.role === 'MEMBER'
-        ? persons.filter((person) => person.id === user.id)
-        : persons.filter((person) => user?.memberIds.includes(person.id));
+
+  const leaderCellIds = React.useMemo(() => {
+    if (!user) return [];
+    const supervisedCellIds = user.supervisedCellIds || [];
+    return cells
+      .filter(c => c.leaderId === user.id || supervisedCellIds.includes(c.id))
+      .map(c => c.id);
+  }, [user, cells]);
+
+  const scopedPeople = React.useMemo(() => {
+    if (!user) return [];
+    if (permissions.isGlobalScope) return persons;
+    if (user.role === 'MEMBER') return persons.filter((p) => p.id === user.id);
+
+    const memberIds = new Set(
+      cells
+        .filter(c => leaderCellIds.includes(c.id))
+        .flatMap(c => c.memberIds)
+    );
+    return persons.filter(per => memberIds.has(per.id));
+  }, [user, permissions.isGlobalScope, persons, cells, leaderCellIds]);
+
   const scopedPairs =
     permissions.isGlobalScope
       ? discipleshipPairs
       : user?.role === 'LEADER'
         ? discipleshipPairs.filter((pair) => pair.mentorId === user.id || pair.discipleId === user.id)
         : user?.role === 'DISCIPLER'
-          ? discipleshipPairs.filter((pair) => user.leaderPersonIds.includes(pair.mentorId) || pair.discipleId === user.id)
+          ? discipleshipPairs.filter((pair) => user.leaderPersonIds?.includes(pair.mentorId) || pair.discipleId === user.id)
           : discipleshipPairs.filter((pair) => pair.discipleId === user?.id);
-  const scopedFollowUps =
-    permissions.isGlobalScope
-      ? followUps
-      : followUps.filter((item) => item.personId === user?.id || item.responsibleId === user?.id || user?.memberIds.includes(item.personId));
+
+  const scopedFollowUps = React.useMemo(() => {
+    if (!user) return [];
+    if (permissions.isGlobalScope) return followUps;
+
+    // People in scope for follow-up (same as scopedPeople but as IDs)
+    const scopedPersonIds = new Set(scopedPeople.map(p => p.id));
+
+    return followUps.filter((item) => 
+      item.personId === user.id || 
+      item.responsibleId === user.id || 
+      scopedPersonIds.has(item.personId)
+    );
+  }, [user, permissions.isGlobalScope, followUps, scopedPeople]);
+
   const upcomingEvents = [...events]
     .filter((event) => new Date(event.date).getTime() >= Date.now() - 86400000)
     .sort((left, right) => left.date.localeCompare(right.date))
@@ -86,13 +115,13 @@ export default function Dashboard() {
       ]
     : user?.role === 'MEMBER'
       ? [
-          { label: 'Minha célula', value: myCell?.name ?? 'Sem célula', icon: Network },
+          { label: 'Minha célula', value: dashboardCell?.name ?? 'Sem célula', icon: Network },
           { label: 'Membros da família', value: myFamilySize, icon: Users, onClick: () => navigate('/familia'), actionLabel: 'Gerir' },
           { label: 'Discipulado ativo', value: scopedPairs.length, icon: BookOpen },
           { label: 'Acompanhamentos abertos', value: scopedFollowUps.filter((item) => item.status !== 'Concluído').length, icon: HeartHandshake },
         ]
       : [
-          { label: 'Minha célula', value: myCell?.name ?? 'Sem célula', icon: Network },
+          { label: 'Minha célula', value: dashboardCell?.name ?? 'Sem célula', icon: Network },
           { label: 'Pessoas no meu scope', value: scopedPeople.length, icon: Users },
           { label: 'Discipulado ativo', value: scopedPairs.length, icon: BookOpen },
           { label: 'Acompanhamentos abertos', value: scopedFollowUps.filter((item) => item.status !== 'Concluído').length, icon: HeartHandshake },

@@ -4,6 +4,7 @@ import { Save, User as UserIcon, X } from 'lucide-react';
 import type { Role } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import { getRoleLabel } from '../../lib/roleLabels';
+import { normalizeInternationalPhone, PHONE_PLACEHOLDER, PHONE_HELP_TEXT } from '../../lib/phone';
 import type { Person, PersonInput } from '../../types/domain';
 
 interface PersonFormModalProps {
@@ -74,7 +75,7 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim(),
-        phone: formData.phone.trim(),
+        phone: normalizeInternationalPhone(formData.phone),
         notes: formData.notes?.trim() ?? '',
       };
 
@@ -163,9 +164,22 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
                     type="text"
                     value={formData.phone}
                     onChange={(event) => setFormData((current) => ({ ...current, phone: event.target.value }))}
+                    placeholder={PHONE_PLACEHOLDER}
                     className="input-heritage"
                   />
+                  <p className="text-[10px] text-slate-400">{PHONE_HELP_TEXT}</p>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Endereço / Morada</label>
+                <input
+                  type="text"
+                  value={formData.address ?? ''}
+                  onChange={(event) => setFormData((current) => ({ ...current, address: event.target.value }))}
+                  placeholder="Rua, Número, Andar, Código Postal, Cidade"
+                  className="input-heritage"
+                />
               </div>
 
               <div className="grid grid-cols-1 gap-6 md:grid-cols-3">

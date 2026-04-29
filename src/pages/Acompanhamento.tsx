@@ -43,22 +43,22 @@ export default function Acompanhamento() {
     if (p.isGlobalScope) return followUps;
 
     const supervisedCellIds = user.supervisedCellIds || [];
-
-    // Discipulador: acompanhamentos das suas células
-    if (user.role === 'DISCIPLER') {
-      return followUps.filter(fu => fu.cellId && supervisedCellIds.includes(fu.cellId));
-    }
     
-    // Líder: acompanhamentos sob sua responsabilidade directa ou da sua célula
-    if (user.role === 'LEADER') {
+    // Leader scope: cells led by user + supervised cells
+    const leaderCellIds = cells
+      .filter(c => c.leaderId === user.id || supervisedCellIds.includes(c.id))
+      .map(c => c.id);
+
+    // Discipulador ou Líder: acompanhamentos das suas células ou sob sua responsabilidade directa
+    if (user.role === 'DISCIPLER' || user.role === 'LEADER') {
       return followUps.filter(fu => 
-        (fu.cellId && supervisedCellIds.includes(fu.cellId)) || 
+        (fu.cellId && leaderCellIds.includes(fu.cellId)) || 
         fu.responsibleId === user.id
       );
     }
 
     return [];
-  }, [user, p.isGlobalScope, followUps]);
+  }, [user, p.isGlobalScope, followUps, cells]);
 
   // Filtros
   const [search, setSearch]     = useState('');

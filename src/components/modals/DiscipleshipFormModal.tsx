@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { BookOpen, Save, X } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { usePermissions } from '../../hooks/usePermissions';
 import type { DiscipleshipPair, DiscipleshipPairInput } from '../../types/domain';
 
 interface DiscipleshipFormModalProps {
@@ -19,8 +21,33 @@ export default function DiscipleshipFormModal({
   onSuccess,
   initialData,
 }: DiscipleshipFormModalProps) {
-  const { addDiscipleshipPair, persons, updateDiscipleshipPair } = useData();
+  const { user } = useAuth();
+  const p = usePermissions();
+  const { addDiscipleshipPair, persons, cells, updateDiscipleshipPair } = useData();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // ── Scoped Persons for Selection ─────────────────────────────────────────
+  const selectablePersons = React.useMemo(() => {
+    if (!user) return [];
+    if (p.isGlobalScope) return persons;
+
+    const supervisedCellIds = user.supervisedCellIds || [];
+    const leaderCellIds = cells
+      .filter(c => c.leaderId === user.id || supervisedCellIds.includes(c.id))
+      .map(c => c.id);
+
+    if (user.role === 'DISCIPLER' || user.role === 'LEADER') {
+      const memberIds = new Set(
+        cells
+          .filter(c => leaderCellIds.includes(c.id))
+          .flatMap(c => c.memberIds)
+      );
+      return persons.filter(per => memberIds.has(per.id));
+    }
+    
+    return persons.filter(per => per.id === user.id);
+  }, [user, p.isGlobalScope, persons, cells]);
+
   const [formData, setFormData] = useState<DiscipleshipPairInput>({
     mentorId: '',
     discipleId: '',
@@ -44,7 +71,6 @@ export default function DiscipleshipFormModal({
     });
   }, [initialData, isOpen]);
 
-  const mentors = persons.filter((person) => MENTOR_ROLES.has(person.role));
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -105,7 +131,7 @@ export default function DiscipleshipFormModal({
                     className="input-heritage"
                   >
                     <option value="">Selecionar...</option>
-                    {mentors.map((person) => (
+                    {selectablePersons.filter(p => MENTOR_ROLES.has(p.role)).map((person) => (
                       <option key={person.id} value={person.id}>
                         {person.name}
                       </option>
@@ -121,7 +147,7 @@ export default function DiscipleshipFormModal({
                     className="input-heritage"
                   >
                     <option value="">Selecionar...</option>
-                    {persons.map((person) => (
+                    {selectablePersons.map((person) => (
                       <option key={person.id} value={person.id}>
                         {person.name}
                       </option>

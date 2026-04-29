@@ -38,9 +38,14 @@ export default function Pessoas() {
     const supervisedCellIds = user.supervisedCellIds || [];
 
     if (user.role === 'DISCIPLER' || user.role === 'LEADER') {
+      // Leader scope: cells led by user + supervised cells
+      const leaderCellIds = cells
+        .filter(c => c.leaderId === user.id || supervisedCellIds.includes(c.id))
+        .map(c => c.id);
+
       const memberIds = new Set(
         cells
-          .filter(c => supervisedCellIds.includes(c.id))
+          .filter(c => leaderCellIds.includes(c.id))
           .flatMap(c => c.memberIds)
       );
       return persons.filter(per => memberIds.has(per.id));

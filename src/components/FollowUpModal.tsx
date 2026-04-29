@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { HeartHandshake, X } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
+import { useAuth } from '../contexts/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import type { FollowUp, FollowUpInput } from '../types/domain';
 
 interface FollowUpModalProps {
@@ -14,8 +16,33 @@ interface FollowUpModalProps {
 const RESPONSIBLE_ROLES = new Set(['Líder de Célula', 'Discipulador', 'Pastor', 'Administrador']);
 
 export default function FollowUpModal({ isOpen, onClose, onSubmit, initialData }: FollowUpModalProps) {
-  const { persons } = useData();
+  const { user } = useAuth();
+  const p = usePermissions();
+  const { persons, cells } = useData();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // ── Scoped Persons for Selection ─────────────────────────────────────────
+  const selectablePersons = React.useMemo(() => {
+    if (!user) return [];
+    if (p.isGlobalScope) return persons;
+
+    const supervisedCellIds = user.supervisedCellIds || [];
+    const leaderCellIds = cells
+      .filter(c => c.leaderId === user.id || supervisedCellIds.includes(c.id))
+      .map(c => c.id);
+
+    if (user.role === 'DISCIPLER' || user.role === 'LEADER') {
+      const memberIds = new Set(
+        cells
+          .filter(c => leaderCellIds.includes(c.id))
+          .flatMap(c => c.memberIds)
+      );
+      return persons.filter(per => memberIds.has(per.id));
+    }
+    
+    return persons.filter(per => per.id === user.id);
+  }, [user, p.isGlobalScope, persons, cells]);
+
   const [formData, setFormData] = useState<FollowUpInput>({
     personId: '',
     responsibleId: '',
@@ -96,7 +123,7 @@ export default function FollowUpModal({ isOpen, onClose, onSubmit, initialData }
                   className="input-heritage"
                 >
                   <option value="">Selecionar...</option>
-                  {persons.map((person) => (
+                  {selectablePersons.map((person) => (
                     <option key={person.id} value={person.id}>
                       {person.name}
                     </option>

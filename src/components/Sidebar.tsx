@@ -28,6 +28,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard',      path: '/',               show: true },
     { icon: User,            label: 'Meu Perfil',     path: '/meu-perfil',     show: p.canViewMeuPerfil },
+    { icon: Users,           label: 'A minha família', path: '/familia',       show: p.canViewMinhaFamilia },
     { icon: Calendar,        label: 'A minha Agenda', path: '/minha-agenda',   show: p.canViewAgenda },
     { icon: Users,           label: 'Pessoas',        path: '/pessoas',        show: p.canViewPessoas },
     { icon: Network,         label: 'Células',        path: '/celulas',        show: p.canViewCelulas },

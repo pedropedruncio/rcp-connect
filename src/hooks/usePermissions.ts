@@ -21,7 +21,7 @@ const CAN_VIEW_ACOMPANHAMENTO: Role[]  = ['LEADER', 'DISCIPLER', 'PASTOR', 'ADMI
 const CAN_VIEW_ESCALAS: Role[]         = ['PASTOR', 'ADMIN'];
 const CAN_VIEW_RELATORIOS: Role[]      = ['DISCIPLER', 'PASTOR', 'ADMIN'];
 const CAN_VIEW_CONFIGURACOES: Role[]   = ['ADMIN'];
-const CAN_VIEW_MEU_PERFIL: Role[]      = ['MEMBER'];
+const CAN_VIEW_MEU_PERFIL: Role[]      = ['MEMBER', 'LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'];
 const CAN_VIEW_AGENDA: Role[]          = ['MEMBER', 'LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'];
 const CAN_VIEW_MINHA_FAMILIA: Role[]   = ['MEMBER', 'LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN'];
 
