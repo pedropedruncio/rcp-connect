@@ -154,7 +154,11 @@ type EventRow = {
   name: string;
   description: string | null;
   date: string | null;
+  time: string | null;
+  location: string | null;
+  category: string | null;
   campusId: string | null;
+  status: EventItem['status'] | null;
 };
 
 type ScheduleRow = {
@@ -348,12 +352,12 @@ function mapDomainState(
     name: row.name,
     description: row.description ?? '',
     date: row.date ?? new Date().toISOString().slice(0, 10),
-    time: '19:00',
-    location: row.campusId ? campusMap.get(row.campusId) ?? 'Campus' : 'Campus',
-    category: 'Igreja',
+    time: ensureTimeValue(row.time, '19:00'),
+    location: row.location || (row.campusId ? campusMap.get(row.campusId) ?? 'Campus' : 'Campus'),
+    category: row.category ?? 'Igreja',
     campusId: row.campusId,
     campus: row.campusId ? campusMap.get(row.campusId) ?? 'Sem campus' : 'Sem campus',
-    status: getUpcomingStatus(row.date ?? ''),
+    status: row.status ?? getUpcomingStatus(row.date ?? ''),
     attendeeIds: [],
   }));
 
@@ -714,7 +718,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       name: event.name,
       description: event.description,
       date: event.date,
+      time: event.time,
+      location: event.location,
+      category: event.category,
       campusId: event.campusId,
+      status: event.status,
       }),
     });
 
@@ -728,7 +736,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         ...(data.name ? { name: data.name } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
         ...(data.date ? { date: data.date } : {}),
+        ...(data.time ? { time: data.time } : {}),
+        ...(data.location !== undefined ? { location: data.location } : {}),
+        ...(data.category ? { category: data.category } : {}),
         ...(data.campusId !== undefined ? { campusId: data.campusId } : {}),
+        ...(data.status ? { status: data.status } : {}),
       }),
     });
 

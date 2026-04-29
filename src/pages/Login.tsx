@@ -383,7 +383,7 @@ export default function Login() {
                 )}
 
                 <div className="rounded-lg border border-dashed border-outline-variant bg-white/70 px-4 py-3 text-xs text-slate-500">
-                  No primeiro acesso, o perfil é criado automaticamente com o papel inicial <code>MEMBER</code>.
+                  No primeiro acesso, o perfil é criado automaticamente com o papel inicial <code>Membro</code>.
                 </div>
               </>
             )}

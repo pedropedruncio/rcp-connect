@@ -1,9 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Search, UserPlus, X, Users, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import Toast from '../components/ui/Toast';
+import { apiRequest } from '../lib/api';
+
+type FamilySearchResult = {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string | null;
+};
 
 export default function Familia() {
   const { user } = useAuth();
@@ -17,8 +25,11 @@ export default function Familia() {
   } = useData();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<FamilySearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [isInviting, setIsInviting] = useState(false);
-  const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
+  const [toast, setToast] = useState<{ show: boolean; msg: string; type: 'success' | 'error' | 'info' }>({ show: false, msg: '', type: 'success' });
 
   // 1. My pending invitations (where I am invited)
   const myPendingInvites = useMemo(() => {
@@ -38,51 +49,62 @@ export default function Familia() {
   const currentFamilyMembers = useMemo(() => {
     if (myFamilies.length === 0) return [];
     return familyMembers
-      .filter(m => myFamilies.includes(m.familyId))
+      .filter(m => myFamilies.includes(m.familyId) && m.status === 'ACCEPTED')
       .map(m => {
         const personData = persons.find(p => p.id === m.personId);
         return {
           ...m,
           name: personData?.name ?? 'Utilizador desconhecido',
           email: personData?.email ?? '',
+          avatarUrl: personData?.avatarUrl ?? null,
         };
       });
   }, [familyMembers, myFamilies, persons]);
 
-  // 4. Persons available to invite
-  const availableToInvite = useMemo(() => {
-    if (!searchTerm.trim()) return [];
-    
-    const searchLower = searchTerm.toLowerCase();
-    
-    return persons.filter(p => {
-      // Not me
-      if (p.id === user?.id) return false;
-      
-      // Match name or email
-      if (!p.name.toLowerCase().includes(searchLower) && !p.email?.toLowerCase().includes(searchLower)) {
-        return false;
-      }
-      
-      // Already in my family?
-      const alreadyInMyFamily = currentFamilyMembers.some(fm => fm.personId === p.id);
-      if (alreadyInMyFamily) return false;
-      
-      // Already has another family? (ACCEPTED somewhere else)
-      const hasAnotherFamily = familyMembers.some(fm => fm.personId === p.id && fm.status === 'ACCEPTED');
-      if (hasAnotherFamily) return false;
+  useEffect(() => {
+    const q = searchTerm.trim();
 
-      return true;
-    });
-  }, [persons, searchTerm, user, currentFamilyMembers, familyMembers]);
+    if (q.length < 2) {
+      setSearchResults([]);
+      setHasSearched(false);
+      setIsSearching(false);
+      return;
+    }
+
+    let isCurrent = true;
+    setIsSearching(true);
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const results = await apiRequest<FamilySearchResult[]>(`/family-members/search?q=${encodeURIComponent(q)}`);
+        if (!isCurrent) return;
+        setSearchResults(results);
+        setHasSearched(true);
+      } catch (error: any) {
+        if (!isCurrent) return;
+        setSearchResults([]);
+        setHasSearched(true);
+        setToast({ show: true, msg: error?.message ?? 'Não foi possível pesquisar membros.', type: 'error' });
+      } finally {
+        if (isCurrent) setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      isCurrent = false;
+      window.clearTimeout(timer);
+    };
+  }, [searchTerm]);
 
   const handleInvite = async (targetPersonId: string) => {
     setIsInviting(true);
     try {
       const familyIdToUse = myFamilies.length > 0 ? myFamilies[0] : undefined;
       await inviteFamilyMember(targetPersonId, 'Familiar', familyIdToUse);
-      setToast({ show: true, msg: 'Convite enviado com sucesso!', type: 'success' });
+      setToast({ show: true, msg: 'Convite enviado com sucesso.', type: 'success' });
       setSearchTerm('');
+      setSearchResults([]);
+      setHasSearched(false);
     } catch (err: any) {
       setToast({ show: true, msg: err.message ?? 'Erro ao enviar convite.', type: 'error' });
     } finally {
@@ -117,15 +139,15 @@ export default function Familia() {
       <Toast 
         isVisible={toast.show} 
         message={toast.msg} 
+        type={toast.type}
         onClose={() => setToast(s => ({ ...s, show: false }))} 
-        // type={toast.type} - Assume basic Toast handles colors or extend it
       />
 
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-slate-900">Membros da Família</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Adiciona familiares ao teu grupo para partilharem informações, calendário e notificações.
+            Gere convites familiares com aceite explícito de cada membro.
           </p>
         </div>
       </div>
@@ -134,7 +156,7 @@ export default function Familia() {
         <div className="card-heritage border-gold/30 bg-gold/5 p-6">
           <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-900">
             <AlertCircle className="h-5 w-5 text-gold" />
-            Convites Pendentes
+            Convites pendentes
           </h3>
           <div className="space-y-3">
             {myPendingInvites.map(invite => {
@@ -189,8 +211,12 @@ export default function Familia() {
                 currentFamilyMembers.map(member => (
                   <div key={member.id} className="flex items-center justify-between p-6 hover:bg-slate-50">
                     <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-gold font-bold">
-                        {member.name.substring(0, 1)}
+                      <div className="h-10 w-10 overflow-hidden rounded-full bg-slate-100 flex items-center justify-center text-gold font-bold">
+                        {member.avatarUrl ? (
+                          <img src={member.avatarUrl} alt={member.name} className="h-full w-full object-cover" />
+                        ) : (
+                          member.name.substring(0, 1)
+                        )}
                       </div>
                       <div>
                         <p className="font-semibold text-slate-900">{member.name} {member.personId === user?.id && '(Tu)'}</p>
@@ -218,7 +244,7 @@ export default function Familia() {
           <div className="card-heritage p-6">
             <h3 className="text-xl font-bold text-slate-900 mb-4">Convidar Familiar</h3>
             <p className="text-sm text-slate-500 mb-4">
-              Pesquisa pelo nome ou e-mail de outro membro da igreja. Ele terá de aceitar o convite.
+              Pesquise pelo nome ou e-mail de outro membro da igreja. Ele terá de aceitar o convite.
             </p>
             
             <div className="relative mb-6">
@@ -234,16 +260,31 @@ export default function Familia() {
               />
             </div>
 
-            {searchTerm && (
+            {searchTerm.trim().length > 0 && searchTerm.trim().length < 2 && (
+              <p className="text-sm text-slate-500 text-center py-4">Digite pelo menos 2 caracteres.</p>
+            )}
+
+            {searchTerm.trim().length >= 2 && (
               <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-                {availableToInvite.length === 0 ? (
-                  <p className="text-sm text-slate-500 text-center py-4">Nenhum resultado disponível.</p>
+                {isSearching ? (
+                  <p className="text-sm text-slate-500 text-center py-4">A pesquisar membros...</p>
+                ) : hasSearched && searchResults.length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-4">Nenhum membro encontrado.</p>
                 ) : (
-                  availableToInvite.map(p => (
+                  searchResults.map(p => (
                     <div key={p.id} className="flex items-center justify-between rounded border border-outline-variant p-3 hover:border-gold transition-colors">
-                      <div className="truncate pr-2">
-                        <p className="text-sm font-semibold text-slate-900 truncate">{p.name}</p>
-                        <p className="text-xs text-slate-500 truncate">{p.email}</p>
+                      <div className="flex min-w-0 items-center gap-3 pr-2">
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-gold/10 text-xs font-bold text-gold">
+                          {p.avatarUrl ? (
+                            <img src={p.avatarUrl} alt={p.name} className="h-full w-full object-cover" />
+                          ) : (
+                            p.name.substring(0, 1)
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-900 truncate">{p.name}</p>
+                          <p className="text-xs text-slate-500 truncate">{p.email}</p>
+                        </div>
                       </div>
                       <button
                         onClick={() => handleInvite(p.id)}
@@ -251,7 +292,7 @@ export default function Familia() {
                         className="btn-primary-heritage px-3 py-1.5 text-xs flex-shrink-0 flex items-center gap-1"
                       >
                         <UserPlus className="h-3 w-3" />
-                        Adicionar
+                        Convidar
                       </button>
                     </div>
                   ))

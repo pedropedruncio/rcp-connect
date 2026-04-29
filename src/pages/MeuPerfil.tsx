@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
+import { apiRequest } from '../lib/api';
 import { formatDateLabel, getInitials } from '../lib/domain';
 import ProfileEditModal from '../components/ProfileEditModal';
 import PrayerRequestModal from '../components/PrayerRequestModal';
@@ -85,11 +86,27 @@ export default function MeuPerfil() {
     }
   };
 
-  const handleProfileUpdate = async (data: { phone: string; address: string }) => {
+  const avatarUrl = person?.avatarUrl ?? user.avatarUrl ?? null;
+
+  const handleProfileUpdate = async (data: { phone: string; address: string; avatarImage?: string }) => {
     if (!person) return;
 
     try {
-      await updatePerson(user.id, data);
+      let uploadedAvatarUrl: string | undefined;
+
+      if (data.avatarImage) {
+        const uploadResult = await apiRequest<{ avatarUrl: string }>('/profile/avatar', {
+          method: 'POST',
+          body: JSON.stringify({ image: data.avatarImage }),
+        });
+        uploadedAvatarUrl = uploadResult.avatarUrl;
+      }
+
+      await updatePerson(user.id, {
+        phone: data.phone,
+        address: data.address,
+        ...(uploadedAvatarUrl ? { avatarUrl: uploadedAvatarUrl } : {}),
+      });
       setToast({ show: true, msg: 'Os seus dados foram atualizados com sucesso.', type: 'success' });
     } catch (error: any) {
       setToast({
@@ -134,8 +151,12 @@ export default function MeuPerfil() {
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
           <div className="space-y-6 lg:col-span-4">
             <div className="card-heritage flex flex-col items-center p-8 text-center">
-              <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full border-4 border-white bg-gold/10 text-2xl font-bold text-gold shadow-md">
-                {getInitials(person?.name ?? user.name)}
+              <div className="mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-gold/10 text-2xl font-bold text-gold shadow-md">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={person?.name ?? user.name} className="h-full w-full object-cover" />
+                ) : (
+                  getInitials(person?.name ?? user.name)
+                )}
               </div>
               <h3 className="text-xl font-bold text-slate-900">{person?.name ?? user.name}</h3>
               <p className="mt-1 text-sm text-slate-500">{person?.role ?? 'Membro'}</p>

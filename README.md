@@ -8,6 +8,12 @@ Aplicação React/Vite do RCP Connect com Supabase remoto como backend principal
 - Vercel: `https://rcp-connect.vercel.app`
 - Supabase: configurado por variáveis de ambiente, sem project ref publicado no repositório
 
+## Regra de deploy
+
+- Não fazer deploy manual no Vercel depois de cada alteração.
+- O fluxo correto é commitar e fazer push no GitHub; a integração do Vercel publica automaticamente a partir do repositório.
+- Só usar `vercel deploy` manualmente se a integração GitHub/Vercel estiver indisponível ou se alguém pedir isso explicitamente.
+
 ## Setup
 
 1. Instale dependências com `npm install`

@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { Search, Bell, Settings, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { getRoleLabel } from '../lib/roleLabels';
 
 export default function Layout() {
   const { user } = useAuth();
@@ -34,7 +35,7 @@ export default function Layout() {
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-bold text-slate-900 leading-none">{user?.name || 'Visitante'}</p>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                  {user?.role || 'Sem Acesso'}
+                  {user ? getRoleLabel(user.role) : 'Sem acesso'}
                 </p>
               </div>
               <div className="w-9 h-9 rounded-full bg-surface-container-high overflow-hidden border border-outline-variant">

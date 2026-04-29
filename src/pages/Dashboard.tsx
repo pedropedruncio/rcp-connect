@@ -17,6 +17,7 @@ import { useData } from '../contexts/DataContext';
 import { usePermissions } from '../hooks/usePermissions';
 import EventFormModal from '../components/modals/EventFormModal';
 import Toast from '../components/ui/Toast';
+import ChurchCalendarActions from '../components/ChurchCalendarActions';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -36,6 +37,7 @@ export default function Dashboard() {
   } = useData();
   const [isEventModalOpen, setEventModalOpen] = React.useState(false);
   const [toast, setToast] = React.useState<{ show: boolean; msg: string }>({ show: false, msg: '' });
+  const canManageEvents = user?.role === 'ADMIN' || user?.role === 'PASTOR';
 
   const myCell = user ? getCellByMemberId(user.id) : undefined;
   const ledCell = user ? getCellByLeaderId(user.id) : undefined;
@@ -104,11 +106,13 @@ export default function Dashboard() {
         onClose={() => setToast((current) => ({ ...current, show: false }))}
       />
 
-      <EventFormModal
-        isOpen={isEventModalOpen}
-        onClose={() => setEventModalOpen(false)}
-        onSuccess={(title) => setToast({ show: true, msg: `Evento "${title}" criado com sucesso.` })}
-      />
+      {canManageEvents && (
+        <EventFormModal
+          isOpen={isEventModalOpen}
+          onClose={() => setEventModalOpen(false)}
+          onSuccess={(title) => setToast({ show: true, msg: `Evento "${title}" criado com sucesso.` })}
+        />
+      )}
 
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
@@ -126,7 +130,10 @@ export default function Dashboard() {
           <button onClick={() => navigate('/minha-agenda')} className="btn-secondary-heritage flex items-center gap-2">
             <Calendar className="h-4 w-4" /> Agenda
           </button>
-          {permissions.canViewEventos && (
+          <button onClick={() => navigate('/eventos')} className="btn-secondary-heritage flex items-center gap-2">
+            <Church className="h-4 w-4" /> Agenda da Igreja
+          </button>
+          {canManageEvents && (
             <button onClick={() => setEventModalOpen(true)} className="btn-primary-heritage flex items-center gap-2">
               <Plus className="h-4 w-4" /> Novo evento
             </button>
@@ -199,6 +206,8 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+
+          <ChurchCalendarActions compact onToast={(msg) => setToast({ show: true, msg })} />
 
           {user?.role !== 'MEMBER' && (
             <div className="card-heritage p-6">

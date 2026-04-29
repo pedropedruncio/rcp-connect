@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import PersonFormModal from '../components/modals/PersonFormModal';
 import Toast from '../components/ui/Toast';
+import { getRoleLabel } from '../lib/roleLabels';
 
 type ConfigTab = 'pessoal' | 'ministerial' | 'sistema' | 'credenciais';
 
@@ -101,7 +102,7 @@ export default function Configuracoes() {
                       <h3 className="text-lg font-bold text-slate-900">Perfil atual</h3>
                       <p className="text-sm text-slate-500">Dados ligados à sua conta autenticada.</p>
                     </div>
-                    <span className="badge-heritage bg-slate-100 text-slate-600">{user.role}</span>
+                    <span className="badge-heritage bg-slate-100 text-slate-600">{getRoleLabel(user.role)}</span>
                   </div>
 
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">

@@ -8,6 +8,7 @@ import {
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
+import { getRoleLabel } from '../lib/roleLabels';
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
@@ -64,7 +65,7 @@ export default function Sidebar() {
           </div>
           <div className="min-w-0">
             <p className="text-white text-sm font-bold truncate">{user?.name}</p>
-            <p className="text-gold text-[10px] font-bold uppercase tracking-widest">{user?.role}</p>
+            <p className="text-gold text-[10px] font-bold uppercase tracking-widest">{getRoleLabel(user?.role)}</p>
           </div>
         </div>
       </div>

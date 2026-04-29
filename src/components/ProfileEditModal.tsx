@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, User, Phone, MapPin } from 'lucide-react';
+import { Image as ImageIcon, MapPin, Phone, Upload, User, X } from 'lucide-react';
+import { optimizeAvatarImage } from '../lib/avatarImage';
 
 interface ProfileEditModalProps {
   isOpen: boolean;
@@ -14,6 +15,8 @@ export default function ProfileEditModal({ isOpen, onClose, person, onSave }: Pr
     phone: person?.phone || '',
     address: person?.address || '',
   });
+  const [avatarImage, setAvatarImage] = useState<{ dataUrl: string; previewUrl: string; size: number; type: string } | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -23,7 +26,13 @@ export default function ProfileEditModal({ isOpen, onClose, person, onSave }: Pr
       phone: person?.phone || '',
       address: person?.address || '',
     });
+    setAvatarImage(null);
+    setImageError(null);
   }, [isOpen, person?.address, person?.phone]);
+
+  useEffect(() => () => {
+    if (avatarImage?.previewUrl) URL.revokeObjectURL(avatarImage.previewUrl);
+  }, [avatarImage?.previewUrl]);
 
   if (!isOpen) return null;
 
@@ -35,12 +44,33 @@ export default function ProfileEditModal({ isOpen, onClose, person, onSave }: Pr
       await onSave({
         phone: formData.phone.trim(),
         address: formData.address.trim(),
+        avatarImage: avatarImage?.dataUrl,
       });
       onClose();
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImageError(null);
+
+    try {
+      const optimized = await optimizeAvatarImage(file);
+      setAvatarImage((current) => {
+        if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl);
+        return optimized;
+      });
+    } catch (error: any) {
+      setAvatarImage(null);
+      setImageError(error?.message ?? 'Não foi possível preparar esta imagem.');
+    }
+  };
+
+  const previewUrl = avatarImage?.previewUrl ?? person?.avatarUrl ?? null;
 
   return (
     <AnimatePresence>
@@ -64,6 +94,33 @@ export default function ProfileEditModal({ isOpen, onClose, person, onSave }: Pr
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 space-y-6 bg-surface">
+            <div className="rounded-xl border border-outline-variant bg-surface-container-high p-4">
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-outline-variant bg-gold/10 text-gold">
+                  {previewUrl ? (
+                    <img src={previewUrl} alt="Pré-visualização do perfil" className="h-full w-full object-cover" />
+                  ) : (
+                    <ImageIcon className="h-6 w-6" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-slate-900">Foto de perfil</p>
+                  <p className="text-xs text-slate-500">PNG, JPG ou WebP. A imagem é otimizada antes de guardar.</p>
+                  {avatarImage && (
+                    <p className="mt-1 text-xs text-slate-400">
+                      Otimizada para {Math.round(avatarImage.size / 1024)}KB.
+                    </p>
+                  )}
+                </div>
+                <label className="btn-secondary-heritage flex cursor-pointer items-center gap-2 px-3 py-2 text-xs">
+                  <Upload className="h-3.5 w-3.5" />
+                  Escolher
+                  <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={handleAvatarChange} className="hidden" />
+                </label>
+              </div>
+              {imageError && <p className="mt-3 text-xs font-medium text-red-600">{imageError}</p>}
+            </div>
+
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Telemóvel</label>

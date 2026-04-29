@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Save, User as UserIcon, X } from 'lucide-react';
 import type { Role } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
+import { getRoleLabel } from '../../lib/roleLabels';
 import type { Person, PersonInput } from '../../types/domain';
 
 interface PersonFormModalProps {
@@ -223,7 +224,7 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
                   >
                     {ROLE_OPTIONS.map((role) => (
                       <option key={role} value={role}>
-                        {role}
+                        {getRoleLabel(role)}
                       </option>
                     ))}
                   </select>

@@ -20,9 +20,26 @@ function getSupabaseConfig() {
   };
 }
 
+function getServiceRoleKey() {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || null;
+}
+
 function createAnonClient() {
   const { url, anonKey } = getSupabaseConfig();
   return createClient(url, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+function createPrivilegedClient() {
+  const serviceRoleKey = getServiceRoleKey();
+  if (!serviceRoleKey) return null;
+
+  const { url } = getSupabaseConfig();
+  return createClient(url, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -164,6 +181,25 @@ function json(statusCode, body, cookies = []) {
   return response;
 }
 
+function raw(statusCode, body, headers = {}, cookies = []) {
+  const response = {
+    statusCode,
+    headers: {
+      'Cache-Control': 'no-store',
+      ...headers,
+    },
+    body,
+  };
+
+  if (cookies.length > 0) {
+    response.multiValueHeaders = {
+      'Set-Cookie': cookies,
+    };
+  }
+
+  return response;
+}
+
 function redirect(location, cookies = []) {
   const response = {
     statusCode: 302,
@@ -245,6 +281,7 @@ function authUserFromProfile(profile, scope, sbUser) {
   const lastName = profile.Person?.lastName ?? '';
   const phone = profile.Person?.phone ?? null;
   const address = profile.Person?.address ?? null;
+  const providerAvatar = sbUser.user_metadata?.avatar_url ?? sbUser.user_metadata?.picture ?? null;
   const needsOnboarding = !phone || !address;
 
   return {
@@ -255,7 +292,7 @@ function authUserFromProfile(profile, scope, sbUser) {
     role: profile.Role?.name ?? 'MEMBER',
     campus: profile.Person?.Campus?.name ?? 'Sem campus',
     cellId: profile.Person?.cellGroupId ?? null,
-    avatarUrl: sbUser.user_metadata?.avatar_url ?? null,
+    avatarUrl: profile.Person?.avatarUrl ?? providerAvatar,
     supervisedCellIds: scope.supervisedCellIds,
     memberIds: scope.memberIds,
     leaderPersonIds: scope.leaderPersonIds,
@@ -330,6 +367,7 @@ async function createAutomaticProfile(client, sbUser) {
   const fullName = sbUser.user_metadata?.full_name?.trim() || sbUser.email.split('@')[0] || 'Novo Membro';
   const [firstName, ...rest] = fullName.split(/\s+/);
   const personId = `per_${crypto.randomUUID()}`;
+  const providerAvatar = sbUser.user_metadata?.avatar_url ?? sbUser.user_metadata?.picture ?? null;
 
   const { error: personError } = await client.from('Person').insert({
     id: personId,
@@ -338,6 +376,7 @@ async function createAutomaticProfile(client, sbUser) {
     email: sbUser.email,
     campusId: defaultCampus?.id ?? null,
     status: 'MEMBRO',
+    avatarUrl: providerAvatar,
   });
 
   if (personError) throw personError;
@@ -362,6 +401,7 @@ async function createAutomaticProfile(client, sbUser) {
         id,
         firstName,
         lastName,
+        avatarUrl,
         campusId,
         cellGroupId,
         Campus ( name )
@@ -389,6 +429,7 @@ async function getAuthUser(client, sbUser) {
         lastName,
         phone,
         address,
+        avatarUrl,
         campusId,
         cellGroupId,
         Campus ( name )
@@ -449,7 +490,7 @@ async function getData(client) {
     client.from('FollowUp').select('id, personId, responsibleId, type, date, status, priority, notes'),
     client.from('Family').select('id, name'),
     client.from('Ministry').select('id, name, description'),
-    client.from('Event').select('id, name, description, date, campusId'),
+    client.from('Event').select('id, name, description, date, time, location, category, campusId, status'),
     client.from('Schedule').select('id, ministryId, date, time, status'),
     optionalSelect(client, 'FamilyMember', 'id, familyId, personId, relationship, isPrimaryContact, status'),
     optionalSelect(client, 'MinistryMember', 'id'),
@@ -499,6 +540,266 @@ async function getData(client) {
     preferences: preferencesResult.data,
     settings: settingsResult.data,
   };
+}
+
+function escapeIcsText(value = '') {
+  return String(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/\n/g, '\\n')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;');
+}
+
+function toUtcStamp(date = new Date()) {
+  return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+}
+
+function toLisbonDateTime(dateValue, timeValue = '19:00') {
+  const cleanDate = /^\d{4}-\d{2}-\d{2}$/.test(String(dateValue ?? ''))
+    ? String(dateValue)
+    : new Date().toISOString().slice(0, 10);
+  const cleanTime = /^\d{2}:\d{2}/.test(String(timeValue ?? '')) ? String(timeValue).slice(0, 5) : '19:00';
+  return `${cleanDate.replace(/-/g, '')}T${cleanTime.replace(':', '')}00`;
+}
+
+function addHoursToIcsDateTime(icsDateTime, hours = 2) {
+  const year = Number(icsDateTime.slice(0, 4));
+  const month = Number(icsDateTime.slice(4, 6)) - 1;
+  const day = Number(icsDateTime.slice(6, 8));
+  const hour = Number(icsDateTime.slice(9, 11));
+  const minute = Number(icsDateTime.slice(11, 13));
+  const date = new Date(Date.UTC(year, month, day, hour + hours, minute, 0));
+  return `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, '0')}${String(date.getUTCDate()).padStart(2, '0')}T${String(date.getUTCHours()).padStart(2, '0')}${String(date.getUTCMinutes()).padStart(2, '0')}00`;
+}
+
+async function getChurchEvents(client) {
+  const [{ data: events, error: eventsError }, { data: campuses, error: campusesError }] = await Promise.all([
+    client.from('Event').select('id, name, description, date, time, location, category, campusId, status').order('date'),
+    client.from('Campus').select('id, name'),
+  ]);
+
+  if (eventsError) throw eventsError;
+  if (campusesError) throw campusesError;
+
+  const campusMap = new Map((campuses ?? []).map((campus) => [campus.id, campus.name]));
+
+  return (events ?? []).map((event) => ({
+    ...event,
+    time: event.time ?? '19:00',
+    location: event.location || (event.campusId ? campusMap.get(event.campusId) ?? '' : ''),
+    category: event.category ?? 'Igreja',
+    status: event.status ?? 'Confirmado',
+  }));
+}
+
+async function handleChurchCalendarFeed(event) {
+  const dataClient = createPrivilegedClient() ?? createAnonClient();
+  const events = await getChurchEvents(dataClient);
+  const origin = getRequestOrigin(event);
+  const stamp = toUtcStamp();
+
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//RCP Connect//Church Calendar//PT',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:Agenda da Igreja RCP',
+    'X-WR-TIMEZONE:Europe/Lisbon',
+  ];
+
+  events.forEach((churchEvent) => {
+    const startsAt = toLisbonDateTime(churchEvent.date, churchEvent.time);
+    const endsAt = addHoursToIcsDateTime(startsAt, 2);
+    const description = [
+      churchEvent.description,
+      `Categoria: ${churchEvent.category}`,
+      `Estado: ${churchEvent.status}`,
+    ].filter(Boolean).join('\\n');
+
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:${escapeIcsText(churchEvent.id)}@rcp-connect`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;TZID=Europe/Lisbon:${startsAt}`,
+      `DTEND;TZID=Europe/Lisbon:${endsAt}`,
+      `SUMMARY:${escapeIcsText(churchEvent.name)}`,
+      `DESCRIPTION:${escapeIcsText(description)}`,
+      `LOCATION:${escapeIcsText(churchEvent.location)}`,
+      `URL:${origin}/eventos`,
+      'END:VEVENT',
+    );
+  });
+
+  lines.push('END:VCALENDAR');
+
+  return raw(200, `${lines.join('\r\n')}\r\n`, {
+    'Content-Type': 'text/calendar; charset=utf-8',
+    'Content-Disposition': 'attachment; filename="agenda-igreja-rcp.ics"',
+  });
+}
+
+function normalizeSearchTerm(value) {
+  return String(value ?? '')
+    .replace(/[^\p{L}\p{N}@._\-\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function searchFamilyMembers(auth, query) {
+  const q = normalizeSearchTerm(firstQueryValue(query.q));
+
+  if (q.length < 2) {
+    return [];
+  }
+
+  const currentPersonId = await getCurrentPersonId(auth.client, auth.user);
+  const dataClient = createPrivilegedClient() ?? auth.client;
+  const firstTerm = q.split(/\s+/)[0];
+
+  const { data: currentMemberships, error: membershipsError } = await dataClient
+    .from('FamilyMember')
+    .select('familyId')
+    .eq('personId', currentPersonId)
+    .eq('status', 'ACCEPTED');
+
+  if (membershipsError) throw membershipsError;
+
+  const familyIds = (currentMemberships ?? []).map((item) => item.familyId);
+
+  const { data: people, error: peopleError } = await dataClient
+    .from('Person')
+    .select('id, firstName, lastName, email, avatarUrl')
+    .or(`firstName.ilike.%${firstTerm}%,lastName.ilike.%${firstTerm}%,email.ilike.%${firstTerm}%`)
+    .neq('id', currentPersonId)
+    .limit(30);
+
+  if (peopleError) throw peopleError;
+
+  const normalizedNeedle = q.toLowerCase();
+  const matchedPeople = (people ?? [])
+    .map((person) => {
+      const name = `${person.firstName ?? ''} ${person.lastName ?? ''}`.trim();
+      return {
+        id: person.id,
+        name,
+        email: person.email ?? '',
+        avatarUrl: person.avatarUrl ?? null,
+      };
+    })
+    .filter((person) => `${person.name} ${person.email}`.toLowerCase().includes(normalizedNeedle));
+
+  if (matchedPeople.length === 0) {
+    return [];
+  }
+
+  const candidateIds = matchedPeople.map((person) => person.id);
+  const [{ data: acceptedRows, error: acceptedError }, pendingResult] = await Promise.all([
+    dataClient
+      .from('FamilyMember')
+      .select('personId')
+      .in('personId', candidateIds)
+      .eq('status', 'ACCEPTED'),
+    familyIds.length > 0
+      ? dataClient
+        .from('FamilyMember')
+        .select('personId')
+        .in('familyId', familyIds)
+        .in('personId', candidateIds)
+        .eq('status', 'PENDING')
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (acceptedError) throw acceptedError;
+  if (pendingResult.error) throw pendingResult.error;
+
+  const acceptedIds = new Set((acceptedRows ?? []).map((item) => item.personId));
+  const pendingIds = new Set((pendingResult.data ?? []).map((item) => item.personId));
+
+  return matchedPeople
+    .filter((person) => !acceptedIds.has(person.id) && !pendingIds.has(person.id))
+    .slice(0, 10);
+}
+
+function parseImagePayload(image) {
+  const match = /^data:(image\/(?:png|jpe?g|webp));base64,([a-z0-9+/=]+)$/i.exec(String(image ?? ''));
+  if (!match) {
+    const error = new Error('Imagem inválida.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const contentType = match[1].toLowerCase() === 'image/jpg' ? 'image/jpeg' : match[1].toLowerCase();
+  const buffer = Buffer.from(match[2], 'base64');
+
+  if (buffer.length > 1024 * 1024) {
+    const error = new Error('A imagem otimizada deve ter no máximo 1MB.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return { buffer, contentType };
+}
+
+async function ensureAvatarBucket(client) {
+  const bucket = 'profile-avatars';
+  const privilegedClient = createPrivilegedClient();
+
+  if (!privilegedClient) {
+    return { client, bucket };
+  }
+
+  const { error: lookupError } = await privilegedClient.storage.getBucket(bucket);
+  if (lookupError) {
+    const { error: createError } = await privilegedClient.storage.createBucket(bucket, {
+      public: true,
+      fileSizeLimit: 1024 * 1024,
+      allowedMimeTypes: ['image/png', 'image/jpeg', 'image/webp'],
+    });
+
+    if (createError && !/already exists/i.test(createError.message)) {
+      throw createError;
+    }
+  } else {
+    const { error: updateBucketError } = await privilegedClient.storage.updateBucket(bucket, {
+      public: true,
+      fileSizeLimit: 1024 * 1024,
+      allowedMimeTypes: ['image/png', 'image/jpeg', 'image/webp'],
+    });
+    if (updateBucketError) {
+      console.warn('[profile-avatar] Could not update bucket settings:', updateBucketError.message);
+    }
+  }
+
+  return { client: privilegedClient, bucket };
+}
+
+async function uploadProfileAvatar(auth, body) {
+  const authUser = await getAuthUser(auth.client, auth.user);
+  const { buffer, contentType } = parseImagePayload(body.image);
+  const extension = contentType === 'image/png' ? 'png' : contentType === 'image/jpeg' ? 'jpg' : 'webp';
+  const { client: storageClient, bucket } = await ensureAvatarBucket(auth.client);
+  const path = `${authUser.id}/avatar.${extension}`;
+
+  const { error: uploadError } = await storageClient.storage.from(bucket).upload(path, buffer, {
+    cacheControl: '3600',
+    contentType,
+    upsert: true,
+  });
+
+  if (uploadError) throw uploadError;
+
+  const { data: publicUrlData } = storageClient.storage.from(bucket).getPublicUrl(path);
+  const avatarUrl = `${publicUrlData.publicUrl}?v=${Date.now()}`;
+  const dataClient = createPrivilegedClient() ?? auth.client;
+  const { error: updateError } = await dataClient
+    .from('Person')
+    .update({ avatarUrl })
+    .eq('id', authUser.id);
+
+  if (updateError) throw updateError;
+
+  return avatarUrl;
 }
 
 async function insertRow(client, table, payload) {
@@ -597,6 +898,10 @@ export async function handler(event) {
   try {
     const method = event.httpMethod;
     const path = getPath(event);
+
+    if (method === 'GET' && path === '/calendar/church.ics') {
+      return handleChurchCalendarFeed(event);
+    }
 
     if (method === 'POST' && path === '/auth/login') {
       const { email, password } = JSON.parse(event.body ?? '{}');
@@ -807,10 +1112,21 @@ export async function handler(event) {
       return json(200, data ?? [], auth.cookies);
     }
 
+    if (method === 'GET' && path === '/family-members/search') {
+      return json(200, await searchFamilyMembers(auth, event.queryStringParameters ?? {}), auth.cookies);
+    }
+
+    if (method === 'POST' && path === '/profile/avatar') {
+      const body = event.body ? JSON.parse(event.body) : {};
+      const avatarUrl = await uploadProfileAvatar(auth, body);
+      return json(200, { avatarUrl }, auth.cookies);
+    }
+
     if (method === 'POST' && path === '/family-members/invite') {
       const body = event.body ? JSON.parse(event.body) : {};
       const { targetPersonId, relationship, familyId } = body;
       const currentPersonId = await getCurrentPersonId(auth.client, auth.user);
+      const familyClient = createPrivilegedClient() ?? auth.client;
       const normalizedRelationship = typeof relationship === 'string' ? relationship.trim() : '';
 
       if (!targetPersonId || !normalizedRelationship) {
@@ -821,7 +1137,7 @@ export async function handler(event) {
         return json(400, { error: 'Não pode convidar a si próprio.' }, auth.cookies);
       }
 
-      const { data: targetPerson, error: targetPersonError } = await auth.client
+      const { data: targetPerson, error: targetPersonError } = await familyClient
         .from('Person')
         .select('id')
         .eq('id', targetPersonId)
@@ -832,7 +1148,7 @@ export async function handler(event) {
         return json(404, { error: 'Pessoa não encontrada ou sem acesso.' }, auth.cookies);
       }
 
-      const { data: targetHasFamily, error: existingTargetError } = await auth.client
+      const { data: targetHasFamily, error: existingTargetError } = await familyClient
         .rpc('person_has_accepted_family', { row_person_id: targetPersonId });
 
       if (existingTargetError) throw existingTargetError;
@@ -841,7 +1157,7 @@ export async function handler(event) {
       }
 
       let targetFamilyId = familyId;
-      const { data: senderFamilies, error: senderFamiliesError } = await auth.client
+      const { data: senderFamilies, error: senderFamiliesError } = await familyClient
         .from('FamilyMember')
         .select('familyId')
         .eq('personId', currentPersonId)
@@ -858,7 +1174,7 @@ export async function handler(event) {
         targetFamilyId = senderFamilies[0].familyId;
       } else {
         const newFamilyId = `fam_${crypto.randomUUID()}`;
-        const { data: newFam, error: famErr } = await auth.client
+        const { data: newFam, error: famErr } = await familyClient
           .from('Family')
           .insert({ id: newFamilyId, name: 'Família' })
           .select('id')
@@ -867,7 +1183,7 @@ export async function handler(event) {
         if (famErr) throw famErr;
         targetFamilyId = newFam.id;
 
-        const { error: senderMemberErr } = await auth.client
+        const { error: senderMemberErr } = await familyClient
           .from('FamilyMember')
           .insert({
             id: `fam_mem_${crypto.randomUUID()}`,
@@ -881,7 +1197,20 @@ export async function handler(event) {
         if (senderMemberErr) throw senderMemberErr;
       }
 
-      const { error: inviteErr } = await auth.client.from('FamilyMember').insert({
+      const { data: existingPendingInvite, error: pendingInviteError } = await familyClient
+        .from('FamilyMember')
+        .select('id')
+        .eq('familyId', targetFamilyId)
+        .eq('personId', targetPersonId)
+        .eq('status', 'PENDING')
+        .maybeSingle();
+
+      if (pendingInviteError) throw pendingInviteError;
+      if (existingPendingInvite) {
+        return json(400, { error: 'Já existe um convite pendente para esta pessoa.' }, auth.cookies);
+      }
+
+      const { error: inviteErr } = await familyClient.from('FamilyMember').insert({
         id: `fam_mem_${crypto.randomUUID()}`,
         familyId: targetFamilyId,
         personId: targetPersonId,
@@ -893,7 +1222,7 @@ export async function handler(event) {
       if (inviteErr) throw inviteErr;
 
       try {
-        await auth.client.from('SystemNotification').insert({
+        await familyClient.from('SystemNotification').insert({
           id: `notif_${crypto.randomUUID()}`,
           type: 'FAMILY_INVITE',
           content: {
@@ -912,7 +1241,8 @@ export async function handler(event) {
     if (method === 'POST' && path === '/family-members/accept') {
       const { memberId } = event.body ? JSON.parse(event.body) : {};
       const currentPersonId = await getCurrentPersonId(auth.client, auth.user);
-      const { data: acceptedInvite, error: updateErr } = await auth.client
+      const familyClient = createPrivilegedClient() ?? auth.client;
+      const { data: acceptedInvite, error: updateErr } = await familyClient
         .from('FamilyMember')
         .update({ status: 'ACCEPTED' })
         .eq('id', memberId)
@@ -932,7 +1262,8 @@ export async function handler(event) {
     if (method === 'POST' && path === '/family-members/reject') {
       const { memberId } = event.body ? JSON.parse(event.body) : {};
       const currentPersonId = await getCurrentPersonId(auth.client, auth.user);
-      const { data: rejectedInvite, error: inviteLookupError } = await auth.client
+      const familyClient = createPrivilegedClient() ?? auth.client;
+      const { data: rejectedInvite, error: inviteLookupError } = await familyClient
         .from('FamilyMember')
         .select('id')
         .eq('id', memberId)
@@ -945,7 +1276,7 @@ export async function handler(event) {
         return json(404, { error: 'Convite não encontrado.' }, auth.cookies);
       }
 
-      const { error: delErr } = await auth.client
+      const { error: delErr } = await familyClient
         .from('FamilyMember')
         .delete()
         .eq('id', memberId)

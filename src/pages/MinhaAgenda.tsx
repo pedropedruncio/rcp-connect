@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Calendar as CalendarIcon, Clock, MapPin } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 
@@ -16,21 +17,13 @@ type AgendaItem = {
 
 export default function MinhaAgenda() {
   const { user } = useAuth();
-  const { discipleshipPairs, events, followUps, getCellByLeaderId, getCellByMemberId } = useData();
+  const navigate = useNavigate();
+  const { discipleshipPairs, followUps, getCellByLeaderId, getCellByMemberId, schedules } = useData();
 
   if (!user) return null;
 
   const myCell = getCellByMemberId(user.id) ?? getCellByLeaderId(user.id);
   const agenda: AgendaItem[] = [
-    ...events.map((event) => ({
-      id: `event-${event.id}`,
-      title: event.name,
-      type: event.category,
-      date: event.date,
-      time: event.time,
-      location: event.location || event.campus,
-      color: 'bg-gold/10 border-gold/30 text-gold',
-    })),
     ...followUps
       .filter((item) => item.personId === user.id || item.responsibleId === user.id)
       .map((item) => ({
@@ -53,15 +46,31 @@ export default function MinhaAgenda() {
         location: myCell?.location ?? 'A definir',
         color: 'bg-green-50 border-green-200 text-green-600',
       })),
+    ...schedules
+      .filter((schedule) => schedule.volunteerIds.includes(user.id))
+      .map((schedule) => ({
+        id: `schedule-${schedule.id}`,
+        title: schedule.title,
+        type: 'Escala',
+        date: schedule.date,
+        time: schedule.time,
+        location: myCell?.location ?? 'A definir',
+        color: 'bg-gold/10 border-gold/30 text-gold',
+      })),
   ]
     .sort((left, right) => left.date.localeCompare(right.date))
     .slice(0, 8);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mx-auto max-w-4xl space-y-8 p-8">
-      <div>
-        <h2 className="text-4xl font-bold tracking-tight text-slate-900">Minha Agenda</h2>
-        <p className="font-medium text-slate-500">Compromissos derivados dos seus eventos, discipulado e acompanhamento.</p>
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+        <div>
+          <h2 className="text-4xl font-bold tracking-tight text-slate-900">Minha Agenda</h2>
+          <p className="font-medium text-slate-500">Os seus compromissos pessoais, discipulado, acompanhamentos e responsabilidades.</p>
+        </div>
+        <button onClick={() => navigate('/eventos')} className="btn-secondary-heritage flex items-center gap-2">
+          <CalendarIcon className="h-4 w-4" /> Ver agenda da igreja
+        </button>
       </div>
 
       <div className="card-heritage p-6">
@@ -75,7 +84,7 @@ export default function MinhaAgenda() {
         <div className="space-y-4">
           {agenda.length === 0 ? (
             <div className="rounded-lg border border-dashed border-outline-variant p-8 text-center text-sm text-slate-400">
-              Não existem compromissos no seu calendário neste momento.
+              Não existem compromissos pessoais no seu calendário neste momento.
             </div>
           ) : (
             agenda.map((item) => (
