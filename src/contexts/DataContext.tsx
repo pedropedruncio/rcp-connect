@@ -423,7 +423,7 @@ function mapDomainState(
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const [state, setState] = useState<DomainState>(EMPTY_STATE);
   const [supports, setSupports] = useState<SchemaCapabilities>(DEFAULT_SUPPORTS);
   const [error, setError] = useState<string | null>(null);
@@ -525,9 +525,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
       };
 
       if (id) {
+        const personPatchPayload = { ...payload };
+        delete personPatchPayload.id;
+        const memberPatchPayload = {
+          ...(data.firstName !== undefined ? { firstName: data.firstName } : {}),
+          ...(data.lastName !== undefined ? { lastName: data.lastName } : {}),
+          ...(data.phone !== undefined ? { phone: data.phone } : {}),
+          ...(data.address !== undefined ? { address: data.address } : {}),
+          ...(data.birthdate !== undefined ? { birthdate: data.birthdate } : {}),
+          ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl } : {}),
+          ...(data.campusId !== undefined ? { campusId: data.campusId } : {}),
+        };
+        const patchPayload = user?.role === 'MEMBER' ? memberPatchPayload : personPatchPayload;
+        const rolePayload = user?.role === 'ADMIN' && roleName ? { roleName } : {};
+
         await apiRequest(`/people/${encodeURIComponent(id)}`, {
           method: 'PATCH',
-          body: JSON.stringify({ ...payload, roleName }),
+          body: JSON.stringify({ ...patchPayload, ...rolePayload }),
         });
       } else {
         await apiRequest('/people', {
@@ -538,7 +552,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       await refetch();
     },
-    [getPersonById, refetch],
+    [getPersonById, refetch, user?.role],
   );
 
   const addPerson = useCallback(async (person: PersonInput) => {

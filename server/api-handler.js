@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { assertMutationPermission, isAdmin, sanitizePersonPayload } from './authorization.js';
 
 const ACCESS_COOKIE = 'rcp_access_token';
 const REFRESH_COOKIE = 'rcp_refresh_token';
@@ -515,19 +516,33 @@ async function upsertRow(client, table, payload) {
   if (error) throw error;
 }
 
-async function updatePerson(client, id, payload) {
-  const { roleName, ...personPayload } = payload;
-  await updateRow(client, 'Person', id, personPayload);
+async function updatePerson(client, authUser, id, payload) {
+  const { personPayload, roleName, roleId } = sanitizePersonPayload(authUser, id, payload);
 
-  if (roleName) {
-    const { data: role, error: roleError } = await client.from('Role').select('id').eq('name', roleName).single();
-    if (roleError) throw roleError;
+  if (Object.keys(personPayload).length > 0) {
+    await updateRow(client, 'Person', id, personPayload);
+  }
+
+  if (roleName || roleId) {
+    if (!isAdmin(authUser)) {
+      const error = new Error('Apenas administradores podem alterar cargos.');
+      error.statusCode = 403;
+      throw error;
+    }
+
+    let resolvedRoleId = roleId;
+
+    if (roleName) {
+      const { data: role, error: roleError } = await client.from('Role').select('id').eq('name', roleName).single();
+      if (roleError) throw roleError;
+      resolvedRoleId = role.id;
+    }
 
     const { data: userRow, error: userError } = await client.from('User').select('id').eq('personId', id).maybeSingle();
     if (userError) throw userError;
 
     if (userRow) {
-      await updateRow(client, 'User', userRow.id, { roleId: role.id });
+      await updateRow(client, 'User', userRow.id, { roleId: resolvedRoleId });
     }
   }
 }
@@ -543,11 +558,20 @@ async function getCurrentPersonId(client, sbUser) {
   return data.personId;
 }
 
-async function handleMutation(client, method, path, body) {
+async function handleMutation(client, authUser, method, path, body) {
   const [, resource, id] = path.split('/');
 
+  await assertMutationPermission({
+    client,
+    authUser,
+    method,
+    resource,
+    id,
+    body,
+  });
+
   if (resource === 'people' && method === 'POST') return insertRow(client, 'Person', body);
-  if (resource === 'people' && method === 'PATCH' && id) return updatePerson(client, id, body);
+  if (resource === 'people' && method === 'PATCH' && id) return updatePerson(client, authUser, id, body);
   if (resource === 'cells' && method === 'POST') return insertRow(client, 'CellGroup', body);
   if (resource === 'cells' && method === 'PATCH' && id) return updateRow(client, 'CellGroup', id, body);
   if (resource === 'discipleship-pairs' && method === 'POST') return insertRow(client, 'DiscipleshipPair', body);
@@ -934,7 +958,8 @@ export async function handler(event) {
     }
 
     const body = event.body ? JSON.parse(event.body) : {};
-    await handleMutation(auth.client, method, path, body);
+    const authUser = await getAuthUser(auth.client, auth.user);
+    await handleMutation(auth.client, authUser, method, path, body);
     return json(200, { ok: true }, auth.cookies);
   } catch (error) {
     console.error(error);
