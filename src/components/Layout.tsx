@@ -31,7 +31,7 @@ export default function Layout() {
       )}
 
       <main className="flex-1 flex flex-col min-h-screen lg:ml-64 w-full">
-        <header className="sticky top-0 w-full flex justify-between items-center px-4 md:px-8 py-0 h-16 bg-white border-b border-outline-variant z-30">
+        <header className="fixed top-0 left-0 right-0 lg:left-64 flex justify-between items-center px-4 md:px-8 py-0 h-16 bg-white border-b border-outline-variant z-30">
           <div className="flex items-center gap-4">
             <button 
               onClick={toggleSidebar}
@@ -68,7 +68,7 @@ export default function Layout() {
             </div>
           </div>
         </header>
-        <div className="flex-1">
+        <div className="flex-1 pt-16">
           <Outlet />
         </div>
         <footer className="px-4 md:px-8 py-6 border-t border-outline-variant text-slate-400 text-[10px] font-bold uppercase tracking-widest flex flex-col md:flex-row justify-between gap-2 bg-white">
