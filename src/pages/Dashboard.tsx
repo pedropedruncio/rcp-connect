@@ -116,7 +116,7 @@ export default function Dashboard() {
 
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h2 className="text-4xl font-bold tracking-tight text-slate-900">
+          <h2 className="text-2xl md:text-4xl font-bold tracking-tight text-slate-900">
             {permissions.isGlobalScope ? 'Painel ministerial' : `Bem-vindo, ${user?.name}`}
           </h2>
           <p className="font-medium text-slate-500">

@@ -3,14 +3,19 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, UserCircle, Award, Network, Church,
   Calendar, BookOpen, HeartHandshake, CalendarRange, BarChart3,
-  Settings, HelpCircle, LogOut, User
+  Settings, HelpCircle, LogOut, User, X
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { getRoleLabel } from '../lib/roleLabels';
 
-export default function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const p = usePermissions();
@@ -20,41 +25,43 @@ export default function Sidebar() {
     navigate('/login');
   };
 
-  /**
-   * Cada item só aparece quando a permissão correspondente está activa.
-   * A ordem reflecte a hierarquia natural de navegação da aplicação.
-   */
   const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard',      path: '/',               show: true },
-    // Exclusivo do MEMBER
     { icon: User,            label: 'Meu Perfil',     path: '/meu-perfil',     show: p.canViewMeuPerfil },
     { icon: Calendar,        label: 'A minha Agenda', path: '/minha-agenda',   show: p.canViewAgenda },
-    // LEADER+
     { icon: Users,           label: 'Pessoas',        path: '/pessoas',        show: p.canViewPessoas },
     { icon: Network,         label: 'Células',        path: '/celulas',        show: p.canViewCelulas },
     { icon: BookOpen,        label: 'Discipulado',    path: '/discipulado',    show: p.canViewDiscipulado },
     { icon: HeartHandshake,  label: 'Acompanhamento', path: '/acompanhamento', show: p.canViewAcompanhamento },
-    // DISCIPLER+
     { icon: Award,           label: 'Liderança',      path: '/lideranca',      show: p.canViewLideranca },
     { icon: BarChart3,       label: 'Relatórios',     path: '/relatorios',     show: p.canViewRelatorios },
-    // PASTOR+
     { icon: UserCircle,      label: 'Famílias',       path: '/familias',       show: p.canViewFamilias },
     { icon: Church,          label: 'Ministérios',    path: '/ministerios',    show: p.canViewMinisterios },
     { icon: CalendarRange,   label: 'Escalas',        path: '/escalas',        show: p.canViewEscalas },
-    // Todos
     { icon: Calendar,        label: 'Eventos',        path: '/eventos',        show: p.canViewEventos },
-    // ADMIN apenas
     { icon: Settings,        label: 'Configurações',  path: '/configuracoes',  show: p.canViewConfiguracoes },
   ].filter(item => item.show);
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-tertiary flex flex-col py-6 px-0 overflow-y-auto z-50">
+    <aside className={cn(
+      "fixed left-0 top-0 h-screen w-64 bg-tertiary flex flex-col py-6 px-0 overflow-y-auto z-50 transition-transform duration-300 ease-in-out lg:translate-x-0",
+      isOpen ? "translate-x-0" : "-translate-x-full"
+    )}>
       {/* Logo */}
-      <div className="flex items-center gap-3 mb-8 px-6">
-        <div className="w-8 h-8 bg-primary flex items-center justify-center rounded-lg">
-          <Church className="text-white w-5 h-5" />
+      <div className="flex items-center justify-between mb-8 px-6">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-primary flex items-center justify-center rounded-lg">
+            <Church className="text-white w-5 h-5" />
+          </div>
+          <h2 className="text-xl font-bold text-white tracking-tight">RCP Connect</h2>
         </div>
-        <h2 className="text-xl font-bold text-white tracking-tight">RCP Connect</h2>
+        <button 
+          onClick={onClose}
+          className="lg:hidden p-2 text-slate-400 hover:text-white rounded-md"
+          aria-label="Close Menu"
+        >
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       {/* User badge */}
@@ -77,6 +84,7 @@ export default function Sidebar() {
             key={item.path}
             to={item.path}
             end={item.path === '/'}
+            onClick={onClose}
             className={({ isActive }) => cn(
               "flex items-center gap-3 px-6 py-3 transition-all text-sm font-medium border-l-4",
               isActive
