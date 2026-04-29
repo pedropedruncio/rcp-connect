@@ -491,6 +491,7 @@ async function getData(client) {
     discipleshipPairs: pairResult.data ?? [],
     followUps: followUpResult.data ?? [],
     families: familyResult.data ?? [],
+    familyMembers: familyMembersResult.data,
     ministries: ministryResult.data ?? [],
     events: eventResult.data ?? [],
     schedules: scheduleResult.data ?? [],
@@ -529,6 +530,17 @@ async function updatePerson(client, id, payload) {
       await updateRow(client, 'User', userRow.id, { roleId: role.id });
     }
   }
+}
+
+async function getCurrentPersonId(client, sbUser) {
+  const { data, error } = await client
+    .from('User')
+    .select('personId')
+    .eq('supabaseId', sbUser.id)
+    .single();
+
+  if (error) throw error;
+  return data.personId;
 }
 
 async function handleMutation(client, method, path, body) {
@@ -773,109 +785,151 @@ export async function handler(event) {
 
     if (method === 'POST' && path === '/family-members/invite') {
       const body = event.body ? JSON.parse(event.body) : {};
-      const { personId, targetPersonId, relationship, familyId } = body;
-      
-      // Basic check
-      if (!personId || !targetPersonId || !relationship) {
+      const { targetPersonId, relationship, familyId } = body;
+      const currentPersonId = await getCurrentPersonId(auth.client, auth.user);
+      const normalizedRelationship = typeof relationship === 'string' ? relationship.trim() : '';
+
+      if (!targetPersonId || !normalizedRelationship) {
         return json(400, { error: 'Dados em falta.' }, auth.cookies);
       }
 
-      // Check if target is already ACCEPTED in any family
-      const { data: existingTarget } = await auth.client
-        .from('FamilyMember')
-        .select('id')
-        .eq('personId', targetPersonId)
-        .eq('status', 'ACCEPTED');
-        
-      if (existingTarget && existingTarget.length > 0) {
-        return json(400, { error: 'Esta pessoa já pertence a um grupo familiar.' }, auth.cookies);
-      }
-      
-      // Determine familyId. If sender doesn't have a family, create one?
-      // Wait, let's assume familyId is provided.
-      let targetFamilyId = familyId;
-      if (!targetFamilyId) {
-        // Find if sender has a family
-        const { data: senderFam } = await auth.client
-          .from('FamilyMember')
-          .select('familyId')
-          .eq('personId', personId)
-          .eq('status', 'ACCEPTED')
-          .limit(1);
-          
-        if (senderFam && senderFam.length > 0) {
-          targetFamilyId = senderFam[0].familyId;
-        } else {
-          // Create a new family
-          const { data: newFam, error: famErr } = await auth.client
-            .from('Family')
-            .insert({ name: 'Família' }) // Or better name
-            .select('id')
-            .single();
-            
-          if (famErr) throw famErr;
-          targetFamilyId = newFam.id;
-          
-          // Add sender as ACCEPTED primary contact
-          await auth.client.from('FamilyMember').insert({
-            familyId: targetFamilyId,
-            personId: personId,
-            relationship: 'Titular',
-            isPrimaryContact: true,
-            status: 'ACCEPTED'
-          });
-        }
+      if (targetPersonId === currentPersonId) {
+        return json(400, { error: 'Não pode convidar a si próprio.' }, auth.cookies);
       }
 
-      // Create the pending invitation
+      const { data: targetPerson, error: targetPersonError } = await auth.client
+        .from('Person')
+        .select('id')
+        .eq('id', targetPersonId)
+        .maybeSingle();
+
+      if (targetPersonError) throw targetPersonError;
+      if (!targetPerson) {
+        return json(404, { error: 'Pessoa não encontrada ou sem acesso.' }, auth.cookies);
+      }
+
+      const { data: targetHasFamily, error: existingTargetError } = await auth.client
+        .rpc('person_has_accepted_family', { row_person_id: targetPersonId });
+
+      if (existingTargetError) throw existingTargetError;
+      if (targetHasFamily) {
+        return json(400, { error: 'Esta pessoa já pertence a um grupo familiar.' }, auth.cookies);
+      }
+
+      let targetFamilyId = familyId;
+      const { data: senderFamilies, error: senderFamiliesError } = await auth.client
+        .from('FamilyMember')
+        .select('familyId')
+        .eq('personId', currentPersonId)
+        .eq('status', 'ACCEPTED');
+
+      if (senderFamiliesError) throw senderFamiliesError;
+
+      if (targetFamilyId) {
+        const belongsToRequestedFamily = (senderFamilies ?? []).some((item) => item.familyId === targetFamilyId);
+        if (!belongsToRequestedFamily) {
+          return json(403, { error: 'Não tem permissão para convidar para esta família.' }, auth.cookies);
+        }
+      } else if (senderFamilies && senderFamilies.length > 0) {
+        targetFamilyId = senderFamilies[0].familyId;
+      } else {
+        const newFamilyId = `fam_${crypto.randomUUID()}`;
+        const { data: newFam, error: famErr } = await auth.client
+          .from('Family')
+          .insert({ id: newFamilyId, name: 'Família' })
+          .select('id')
+          .single();
+
+        if (famErr) throw famErr;
+        targetFamilyId = newFam.id;
+
+        const { error: senderMemberErr } = await auth.client
+          .from('FamilyMember')
+          .insert({
+            id: `fam_mem_${crypto.randomUUID()}`,
+            familyId: targetFamilyId,
+            personId: currentPersonId,
+            relationship: 'Titular',
+            isPrimaryContact: true,
+            status: 'ACCEPTED',
+          });
+
+        if (senderMemberErr) throw senderMemberErr;
+      }
+
       const { error: inviteErr } = await auth.client.from('FamilyMember').insert({
+        id: `fam_mem_${crypto.randomUUID()}`,
         familyId: targetFamilyId,
         personId: targetPersonId,
-        relationship: relationship,
+        relationship: normalizedRelationship,
         isPrimaryContact: false,
-        status: 'PENDING'
+        status: 'PENDING',
       });
-      
+
       if (inviteErr) throw inviteErr;
-      
+
       try {
         await auth.client.from('SystemNotification').insert({
           id: `notif_${crypto.randomUUID()}`,
           type: 'FAMILY_INVITE',
-          content: { 
+          content: {
             message: 'Recebeu um convite para integrar uma família.',
-            targetPersonId: targetPersonId 
+            targetPersonId,
           },
-          readBy: []
+          readBy: [],
         });
       } catch (notifErr) {
         console.warn('[family-invite] SystemNotification insert error:', notifErr);
       }
-      
+
       return json(200, { ok: true, familyId: targetFamilyId }, auth.cookies);
     }
 
     if (method === 'POST' && path === '/family-members/accept') {
       const { memberId } = event.body ? JSON.parse(event.body) : {};
-      const { error: updateErr } = await auth.client
+      const currentPersonId = await getCurrentPersonId(auth.client, auth.user);
+      const { data: acceptedInvite, error: updateErr } = await auth.client
         .from('FamilyMember')
         .update({ status: 'ACCEPTED' })
         .eq('id', memberId)
-        .eq('personId', auth.user.id);
-        
+        .eq('personId', currentPersonId)
+        .eq('status', 'PENDING')
+        .select('id')
+        .maybeSingle();
+
       if (updateErr) throw updateErr;
+      if (!acceptedInvite) {
+        return json(404, { error: 'Convite não encontrado.' }, auth.cookies);
+      }
+
       return json(200, { ok: true }, auth.cookies);
     }
-    
+
     if (method === 'POST' && path === '/family-members/reject') {
       const { memberId } = event.body ? JSON.parse(event.body) : {};
+      const currentPersonId = await getCurrentPersonId(auth.client, auth.user);
+      const { data: rejectedInvite, error: inviteLookupError } = await auth.client
+        .from('FamilyMember')
+        .select('id')
+        .eq('id', memberId)
+        .eq('personId', currentPersonId)
+        .eq('status', 'PENDING')
+        .maybeSingle();
+
+      if (inviteLookupError) throw inviteLookupError;
+      if (!rejectedInvite) {
+        return json(404, { error: 'Convite não encontrado.' }, auth.cookies);
+      }
+
       const { error: delErr } = await auth.client
         .from('FamilyMember')
         .delete()
         .eq('id', memberId)
-        .eq('personId', auth.user.id);
-        
+        .eq('personId', currentPersonId)
+        .eq('status', 'PENDING');
+
       if (delErr) throw delErr;
+
       return json(200, { ok: true }, auth.cookies);
     }
 

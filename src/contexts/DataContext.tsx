@@ -423,7 +423,7 @@ function mapDomainState(
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const { session, user } = useAuth();
+  const { session } = useAuth();
   const [state, setState] = useState<DomainState>(EMPTY_STATE);
   const [supports, setSupports] = useState<SchemaCapabilities>(DEFAULT_SUPPORTS);
   const [error, setError] = useState<string | null>(null);
@@ -773,14 +773,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await apiRequest('/family-members/invite', {
       method: 'POST',
       body: JSON.stringify({
-        personId: user?.id,
         targetPersonId,
         relationship,
         familyId,
       }),
     });
     await refetch();
-  }, [refetch, user]);
+  }, [refetch]);
 
   const acceptFamilyInvitation = useCallback(async (memberId: string) => {
     await apiRequest('/family-members/accept', {

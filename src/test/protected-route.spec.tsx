@@ -16,6 +16,7 @@ function renderProtectedRoute() {
     <MemoryRouter initialEntries={['/privado']}>
       <Routes>
         <Route path="/login" element={<div>login</div>} />
+        <Route path="/onboarding" element={<div>onboarding</div>} />
         <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
           <Route path="/privado" element={<div>conteudo-privado</div>} />
         </Route>
@@ -29,7 +30,7 @@ describe('ProtectedRoute', () => {
     mockedUseAuth.mockReset();
   });
 
-  it('redireciona convidados para /login', () => {
+  it('redireciona convidados para /onboarding', () => {
     mockedUseAuth.mockReturnValue({
       user: null,
       session: null,
@@ -45,7 +46,7 @@ describe('ProtectedRoute', () => {
     });
 
     renderProtectedRoute();
-    expect(screen.getByText('login')).toBeInTheDocument();
+    expect(screen.getByText('onboarding')).toBeInTheDocument();
   });
 
   it('permite a rota quando o role é aceite', () => {
