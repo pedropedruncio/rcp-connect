@@ -16,6 +16,7 @@ import { formatDateLabel, getInitials } from '../lib/domain';
 import ProfileEditModal from '../components/ProfileEditModal';
 import PrayerRequestModal from '../components/PrayerRequestModal';
 import Toast from '../components/ui/Toast';
+import { buildGoogleMapsSearchUrl } from '../lib/address';
 
 export default function MeuPerfil() {
   const { user } = useAuth();
@@ -39,6 +40,7 @@ export default function MeuPerfil() {
   if (!user) return null;
 
   const person = getPersonById(user.id);
+  const mapsUrl = buildGoogleMapsSearchUrl(person?.address);
   const cell = getCellByMemberId(user.id);
   const cellLeader = cell ? getPersonById(cell.leaderId) : undefined;
   const mentorPair = discipleshipPairs.find((pair) => pair.discipleId === user.id);
@@ -177,6 +179,25 @@ export default function MeuPerfil() {
               {[
                 { icon: Mail, label: 'Email', value: person?.email || user.email },
                 { icon: Phone, label: 'Telefone', value: person?.phone || '—' },
+                { 
+                  icon: MapPin, 
+                  label: 'Morada', 
+                  value: (
+                    <div className="flex flex-col gap-1">
+                      <span>{person?.address || '—'}</span>
+                      {mapsUrl && (
+                        <a 
+                          href={mapsUrl} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="text-[10px] font-bold uppercase tracking-wider text-gold hover:underline"
+                        >
+                          Ver no Google Maps
+                        </a>
+                      )}
+                    </div>
+                  )
+                },
                 { icon: MapPin, label: 'Campus', value: person?.campus || user.campus },
                 { icon: Calendar, label: 'Membro desde', value: person?.since || '—' },
               ].map(({ icon: Icon, label, value }) => (
@@ -184,7 +205,7 @@ export default function MeuPerfil() {
                   <Icon className="mt-0.5 h-4 w-4 flex-shrink-0 text-gold" />
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-slate-400">{label}</p>
-                    <p className="text-sm font-medium text-slate-700">{value}</p>
+                    <div className="text-sm font-medium text-slate-700">{value}</div>
                   </div>
                 </div>
               ))}

@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
+import { normalizeInternationalPhone, isValidInternationalPhone, PHONE_PLACEHOLDER, PHONE_HELP_TEXT } from '../lib/phone';
+import { buildFullAddress } from '../lib/address';
 
 const LS_KEY = 'rcp_onboarding_draft';
 
@@ -27,9 +29,15 @@ export default function CompletarPerfil() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
   const [birthdate, setBirthdate] = useState('');
   const [campusId, setCampusId] = useState('');
+
+  // Address parts state
+  const [street, setStreet] = useState('');
+  const [city, setCity] = useState('');
+  const [zip, setZip] = useState('');
+  const [country, setCountry] = useState('Portugal');
+  const [complement, setComplement] = useState('');
 
   // Pre-fill: user data first, then localStorage draft
   useEffect(() => {
@@ -41,11 +49,11 @@ export default function CompletarPerfil() {
     try {
       const draft = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}');
       if (draft.phone) setPhone(draft.phone);
-      if (draft.address) setAddress(draft.address);
       if (draft.birthdate) setBirthdate(draft.birthdate);
       if (draft.campusId) setCampusId(draft.campusId);
       if (!user && draft.firstName) setFirstName(draft.firstName);
       if (!user && draft.lastName) setLastName(draft.lastName);
+      // If address draft exists, we might want to split it or just ignore it for now as we transitioned to parts
     } catch {
       // ignore
     }
@@ -69,20 +77,37 @@ export default function CompletarPerfil() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone.trim() || !address.trim()) {
-      setError('Telefone e morada são obrigatórios.');
+    
+    if (!isValidInternationalPhone(phone)) {
+      setError(PHONE_HELP_TEXT);
       return;
     }
+
+    const fullAddress = buildFullAddress({
+      street,
+      city,
+      zip,
+      country,
+      complement
+    });
+
+    if (!street.trim() || !city.trim() || !zip.trim()) {
+      setError('Por favor preencha os campos obrigatórios da morada.');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
+
     const { error: err } = await completeOnboarding({
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      phone: phone.trim(),
-      address: address.trim(),
+      phone: normalizeInternationalPhone(phone),
+      address: fullAddress,
       birthdate: birthdate || undefined,
       campusId: campusId || undefined,
     });
+
     setIsSubmitting(false);
     if (err) {
       setError(typeof err === 'string' ? err : (err as any)?.message ?? 'Erro ao guardar perfil.');
@@ -162,28 +187,80 @@ export default function CompletarPerfil() {
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+351 912 345 678"
+                  placeholder={PHONE_PLACEHOLDER}
                   required
                   className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-300"
                 />
               </div>
+              <p className="mt-1 text-[10px] text-slate-400">{PHONE_HELP_TEXT}</p>
             </div>
 
-            {/* Address */}
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
-                Morada *
-              </label>
-              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 focus-within:border-amber-400 focus-within:bg-white transition-colors">
-                <MapPin className="w-4 h-4 text-slate-300 shrink-0" />
-                <input
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Rua Exemplo, 123, Lisboa"
-                  required
-                  className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-300"
-                />
+            {/* Address Section */}
+            <div className="space-y-3 pt-2">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-1">Morada</h3>
+              
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Rua e Número *</label>
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 focus-within:border-amber-400 focus-within:bg-white transition-colors">
+                  <MapPin className="w-4 h-4 text-slate-300 shrink-0" />
+                  <input
+                    type="text"
+                    value={street}
+                    onChange={(e) => setStreet(e.target.value)}
+                    placeholder="Rua Exemplo, 123"
+                    required
+                    className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-300"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Cidade *</label>
+                  <input
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="Braga"
+                    required
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 outline-none focus:border-amber-400 focus:bg-white transition-colors placeholder:text-slate-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Cód. Postal *</label>
+                  <input
+                    type="text"
+                    value={zip}
+                    onChange={(e) => setZip(e.target.value)}
+                    placeholder="4700-000"
+                    required
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 outline-none focus:border-amber-400 focus:bg-white transition-colors placeholder:text-slate-300"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">País *</label>
+                  <input
+                    type="text"
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    placeholder="Portugal"
+                    required
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 outline-none focus:border-amber-400 focus:bg-white transition-colors placeholder:text-slate-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Complemento</label>
+                  <input
+                    type="text"
+                    value={complement}
+                    onChange={(e) => setComplement(e.target.value)}
+                    placeholder="Apartamento, andar..."
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 outline-none focus:border-amber-400 focus:bg-white transition-colors placeholder:text-slate-300"
+                  />
+                </div>
               </div>
             </div>
 

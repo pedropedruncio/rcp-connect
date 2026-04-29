@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Image as ImageIcon, MapPin, Phone, Upload, User, X } from 'lucide-react';
 import { optimizeAvatarImage } from '../lib/avatarImage';
+import { normalizeInternationalPhone, isValidInternationalPhone, PHONE_PLACEHOLDER, PHONE_HELP_TEXT } from '../lib/phone';
+import { cn } from '../lib/utils';
 
 interface ProfileEditModalProps {
   isOpen: boolean;
@@ -17,6 +19,7 @@ export default function ProfileEditModal({ isOpen, onClose, person, onSave }: Pr
   });
   const [avatarImage, setAvatarImage] = useState<{ dataUrl: string; previewUrl: string; size: number; type: string } | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -28,6 +31,7 @@ export default function ProfileEditModal({ isOpen, onClose, person, onSave }: Pr
     });
     setAvatarImage(null);
     setImageError(null);
+    setPhoneError(null);
   }, [isOpen, person?.address, person?.phone]);
 
   useEffect(() => () => {
@@ -38,15 +42,24 @@ export default function ProfileEditModal({ isOpen, onClose, person, onSave }: Pr
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!isValidInternationalPhone(formData.phone)) {
+      setPhoneError(PHONE_HELP_TEXT);
+      return;
+    }
+
     setIsSubmitting(true);
+    setPhoneError(null);
 
     try {
       await onSave({
-        phone: formData.phone.trim(),
+        phone: normalizeInternationalPhone(formData.phone),
         address: formData.address.trim(),
         avatarImage: avatarImage?.dataUrl,
       });
       onClose();
+    } catch (error) {
+      console.error('Error saving profile:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -129,25 +142,36 @@ export default function ProfileEditModal({ isOpen, onClose, person, onSave }: Pr
                   <input
                     type="text"
                     value={formData.phone}
-                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full pl-10 pr-4 py-2.5 bg-surface-container-highest border border-outline-variant rounded-lg text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-gold/50"
-                    placeholder="+351 912 345 678"
+                    onChange={e => {
+                      setFormData({ ...formData, phone: e.target.value });
+                      setPhoneError(null);
+                    }}
+                    className={cn(
+                      "w-full pl-10 pr-4 py-2.5 bg-surface-container-highest border rounded-lg text-sm font-medium text-slate-900 focus:outline-none focus:ring-2",
+                      phoneError ? "border-red-300 focus:ring-red-200" : "border-outline-variant focus:ring-gold/50"
+                    )}
+                    placeholder={PHONE_PLACEHOLDER}
                   />
                 </div>
+                {phoneError ? (
+                  <p className="mt-1.5 text-[10px] font-bold text-red-500 uppercase tracking-wider">{phoneError}</p>
+                ) : (
+                  <p className="mt-1.5 text-[10px] text-slate-400 tracking-wider">{PHONE_HELP_TEXT}</p>
+                )}
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Morada</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Morada completa</label>
                 <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
+                  <MapPin className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                  <textarea
                     value={formData.address}
                     onChange={e => setFormData({ ...formData, address: e.target.value })}
-                    className="w-full pl-10 pr-4 py-2.5 bg-surface-container-highest border border-outline-variant rounded-lg text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-gold/50"
-                    placeholder="Rua da Esperança, 123"
+                    className="w-full pl-10 pr-4 py-2.5 bg-surface-container-highest border border-outline-variant rounded-lg text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-gold/50 min-h-[80px]"
+                    placeholder="Rua, número, cidade, código postal, país"
                   />
                 </div>
+                <p className="mt-1.5 text-[10px] text-slate-400 tracking-wider">Use um endereço completo para facilitar a localização no Google Maps.</p>
               </div>
             </div>
 
