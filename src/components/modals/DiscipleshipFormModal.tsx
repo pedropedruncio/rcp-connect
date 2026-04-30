@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
-import { BookOpen, Save, X } from 'lucide-react';
+import { BookOpen, Save } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';
+import { ModalShell } from '../ui/ModalShell';
 import type { DiscipleshipPair, DiscipleshipPairInput } from '../../types/domain';
 
 interface DiscipleshipFormModalProps {
@@ -25,8 +25,7 @@ export default function DiscipleshipFormModal({
   const p = usePermissions();
   const { addDiscipleshipPair, persons, cells, updateDiscipleshipPair } = useData();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // ── Scoped Persons for Selection ─────────────────────────────────────────
+
   const selectablePersons = React.useMemo(() => {
     if (!user) return [];
     if (p.isGlobal) return persons;
@@ -44,7 +43,7 @@ export default function DiscipleshipFormModal({
       );
       return persons.filter(per => memberIds.has(per.id));
     }
-    
+
     return persons.filter(per => per.id === user.id);
   }, [user, p.isGlobal, persons, cells]);
 
@@ -71,7 +70,6 @@ export default function DiscipleshipFormModal({
     });
   }, [initialData, isOpen]);
 
-
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsSubmitting(true);
@@ -91,126 +89,111 @@ export default function DiscipleshipFormModal({
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-          />
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative flex w-full max-w-xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
-          >
-            <div className="flex items-center justify-between border-b border-outline-variant bg-surface-container-low p-6">
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-blue-50 p-2">
-                  <BookOpen className="h-5 w-5 text-blue-600" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900">{initialData ? 'Editar discipulado' : 'Novo discipulado'}</h3>
-              </div>
-              <button onClick={onClose} className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form id="discipleship-form" onSubmit={handleSubmit} className="space-y-6 p-8">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Mentor</label>
-                  <select
-                    required
-                    value={formData.mentorId}
-                    onChange={(event) => setFormData((current) => ({ ...current, mentorId: event.target.value }))}
-                    className="input-heritage"
-                  >
-                    <option value="">Selecionar...</option>
-                    {selectablePersons.filter(p => MENTOR_ROLES.has(p.role)).map((person) => (
-                      <option key={person.id} value={person.id}>
-                        {person.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Discípulo</label>
-                  <select
-                    required
-                    value={formData.discipleId}
-                    onChange={(event) => setFormData((current) => ({ ...current, discipleId: event.target.value }))}
-                    className="input-heritage"
-                  >
-                    <option value="">Selecionar...</option>
-                    {selectablePersons.map((person) => (
-                      <option key={person.id} value={person.id}>
-                        {person.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Curso</label>
-                <input
-                  type="text"
-                  value={formData.course}
-                  onChange={(event) => setFormData((current) => ({ ...current, course: event.target.value }))}
-                  className="input-heritage"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Progresso</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={formData.progress}
-                    onChange={(event) => setFormData((current) => ({ ...current, progress: Number(event.target.value) }))}
-                    className="input-heritage"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Último encontro</label>
-                  <input
-                    type="date"
-                    value={formData.lastMeeting}
-                    onChange={(event) => setFormData((current) => ({ ...current, lastMeeting: event.target.value }))}
-                    className="input-heritage"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Início</label>
-                  <input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(event) => setFormData((current) => ({ ...current, startDate: event.target.value }))}
-                    className="input-heritage"
-                  />
-                </div>
-              </div>
-            </form>
-
-            <div className="flex items-center justify-end gap-3 border-t border-outline-variant bg-surface-container-low p-6">
-              <button onClick={onClose} className="rounded-md px-6 py-2.5 text-sm font-bold text-slate-500 transition-all hover:bg-slate-100">
-                Cancelar
-              </button>
-              <button type="submit" form="discipleship-form" disabled={isSubmitting} className="btn-primary-heritage flex items-center gap-2 px-8 disabled:opacity-70">
-                <Save className="h-4 w-4" />
-                {isSubmitting ? 'A guardar...' : 'Guardar'}
-              </button>
-            </div>
-          </motion.div>
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      title={initialData ? 'Editar discipulado' : 'Novo discipulado'}
+      description="Defina mentor, discípulo, curso e progresso do percurso."
+      icon={<BookOpen className="h-5 w-5" />}
+      iconClassName="bg-blue-50 text-blue-600"
+      size="lg"
+      footer={(
+        <div className="modal-footer-actions">
+          <button type="button" onClick={onClose} className="btn-secondary-heritage">
+            Cancelar
+          </button>
+          <button type="submit" form="discipleship-form" disabled={isSubmitting} className="btn-primary-heritage flex items-center gap-2">
+            <Save className="h-4 w-4" />
+            {isSubmitting ? 'A guardar...' : 'Guardar'}
+          </button>
         </div>
       )}
-    </AnimatePresence>
+    >
+      <form id="discipleship-form" onSubmit={handleSubmit} className="space-y-5">
+        <section className="modal-section">
+          <h4 className="modal-section-title">Participantes</h4>
+          <div className="modal-grid">
+            <div className="modal-field">
+              <label className="modal-label">Mentor</label>
+              <select
+                required
+                value={formData.mentorId}
+                onChange={(event) => setFormData((current) => ({ ...current, mentorId: event.target.value }))}
+                className="input-heritage"
+              >
+                <option value="">Selecionar...</option>
+                {selectablePersons.filter(person => MENTOR_ROLES.has(person.role)).map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="modal-field">
+              <label className="modal-label">Discípulo</label>
+              <select
+                required
+                value={formData.discipleId}
+                onChange={(event) => setFormData((current) => ({ ...current, discipleId: event.target.value }))}
+                className="input-heritage"
+              >
+                <option value="">Selecionar...</option>
+                {selectablePersons.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section className="modal-section">
+          <h4 className="modal-section-title">Percurso</h4>
+          <div className="modal-field">
+            <label className="modal-label">Curso</label>
+            <input
+              type="text"
+              value={formData.course}
+              onChange={(event) => setFormData((current) => ({ ...current, course: event.target.value }))}
+              className="input-heritage"
+            />
+          </div>
+
+          <div className="modal-grid-3 mt-4">
+            <div className="modal-field">
+              <label className="modal-label">Progresso</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={formData.progress}
+                onChange={(event) => setFormData((current) => ({ ...current, progress: Number(event.target.value) }))}
+                className="input-heritage"
+              />
+            </div>
+            <div className="modal-field">
+              <label className="modal-label">Último encontro</label>
+              <input
+                type="date"
+                value={formData.lastMeeting}
+                onChange={(event) => setFormData((current) => ({ ...current, lastMeeting: event.target.value }))}
+                className="input-heritage"
+              />
+            </div>
+            <div className="modal-field">
+              <label className="modal-label">Início</label>
+              <input
+                type="date"
+                value={formData.startDate}
+                onChange={(event) => setFormData((current) => ({ ...current, startDate: event.target.value }))}
+                className="input-heritage"
+              />
+            </div>
+          </div>
+        </section>
+      </form>
+    </ModalShell>
   );
 }

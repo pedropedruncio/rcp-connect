@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, Users, Check, Plus } from 'lucide-react';
+import { Check, Plus, Users } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
+import { ModalShell } from '../ui/ModalShell';
 import type { CellGroup } from '../../types/domain';
 
 interface TraineeManagementModalProps {
@@ -23,7 +23,7 @@ export default function TraineeManagementModal({ isOpen, onClose, cell }: Traine
       const newTrainees = traineeIds.includes(personId)
         ? traineeIds.filter(id => id !== personId)
         : [...traineeIds, personId];
-      
+
       await updateCell(cell.id, { traineeLeaderIds: newTrainees });
     } catch (err) {
       console.error(err);
@@ -33,70 +33,55 @@ export default function TraineeManagementModal({ isOpen, onClose, cell }: Traine
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-outline-variant flex flex-col max-h-[80vh]"
-          >
-            <div className="flex items-center justify-between p-6 border-b border-outline-variant bg-surface-container-low">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gold/10 rounded-lg">
-                  <Users className="w-5 h-5 text-gold" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900 tracking-tight">Gerir Líderes em Treino</h3>
-                  <p className="text-xs text-slate-500">Selecione os membros em formação de liderança.</p>
-                </div>
-              </div>
-              <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-2">
-              {cellMembers.length === 0 ? (
-                <p className="text-center py-8 text-sm text-slate-400 italic">Nenhum membro encontrado nesta célula.</p>
-              ) : (
-                cellMembers.map(member => {
-                  const isTrainee = traineeIds.includes(member.id);
-                  return (
-                    <button
-                      key={member.id}
-                      disabled={isSubmitting}
-                      onClick={() => handleToggleTrainee(member.id)}
-                      className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${
-                        isTrainee 
-                          ? 'border-gold bg-gold/5 text-gold' 
-                          : 'border-outline-variant bg-surface hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                          isTrainee ? 'bg-gold text-white' : 'bg-slate-100 text-slate-400'
-                        }`}>
-                          {member.name.split(' ').map(n=>n[0]).slice(0,2).join('')}
-                        </div>
-                        <span className="text-sm font-bold">{member.name}</span>
-                      </div>
-                      {isTrainee ? <Check className="w-4 h-4 text-gold" /> : <Plus className="w-4 h-4 text-slate-300" />}
-                    </button>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="p-6 border-t border-outline-variant bg-surface-container-low flex justify-end">
-              <button onClick={onClose} className="px-6 py-2.5 text-sm font-bold text-slate-900 bg-white border border-outline-variant rounded-lg hover:bg-slate-50 transition-all">
-                Fechar
-              </button>
-            </div>
-          </motion.div>
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Gerir líderes em treino"
+      description="Selecione os membros em formação de liderança nesta célula."
+      icon={<Users className="h-5 w-5" />}
+      size="md"
+      zIndexClassName="z-[110]"
+      footer={(
+        <div className="modal-footer-actions">
+          <button type="button" onClick={onClose} className="btn-secondary-heritage">
+            Fechar
+          </button>
         </div>
       )}
-    </AnimatePresence>
+    >
+      <section className="modal-section">
+        <div className="space-y-2">
+          {cellMembers.length === 0 ? (
+            <p className="py-8 text-center text-sm italic text-slate-400">Nenhum membro encontrado nesta célula.</p>
+          ) : (
+            cellMembers.map(member => {
+              const isTrainee = traineeIds.includes(member.id);
+              return (
+                <button
+                  key={member.id}
+                  disabled={isSubmitting}
+                  onClick={() => handleToggleTrainee(member.id)}
+                  className={`flex w-full items-center justify-between rounded-md border p-3 text-left transition-all disabled:opacity-60 ${
+                    isTrainee
+                      ? 'border-gold bg-gold/5 text-gold'
+                      : 'border-outline-variant bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      isTrainee ? 'bg-gold text-white' : 'bg-slate-100 text-slate-400'
+                    }`}>
+                      {member.name.split(' ').map(name => name[0]).slice(0, 2).join('')}
+                    </span>
+                    <span className="truncate text-sm font-bold">{member.name}</span>
+                  </span>
+                  {isTrainee ? <Check className="h-4 w-4 text-gold" /> : <Plus className="h-4 w-4 text-slate-300" />}
+                </button>
+              );
+            })
+          )}
+        </div>
+      </section>
+    </ModalShell>
   );
 }

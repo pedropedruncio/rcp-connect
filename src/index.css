@@ -66,6 +66,50 @@
     @apply px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider;
   }
 
+  .input-heritage {
+    @apply min-h-11 w-full rounded-md border border-outline bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-gold focus:ring-2 focus:ring-gold/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400;
+  }
+
+  textarea.input-heritage {
+    @apply min-h-[112px] resize-y leading-relaxed;
+  }
+
+  .modal-section {
+    @apply rounded-md border border-outline-variant bg-white p-4 shadow-sm sm:p-5;
+  }
+
+  .modal-section + .modal-section {
+    @apply mt-5;
+  }
+
+  .modal-section-title {
+    @apply mb-4 text-[11px] font-bold uppercase tracking-widest text-slate-500;
+  }
+
+  .modal-field {
+    @apply space-y-2;
+  }
+
+  .modal-label {
+    @apply block text-[11px] font-bold uppercase tracking-widest text-slate-500;
+  }
+
+  .modal-help {
+    @apply text-[11px] leading-4 text-slate-400;
+  }
+
+  .modal-grid {
+    @apply grid grid-cols-1 gap-4 md:grid-cols-2;
+  }
+
+  .modal-grid-3 {
+    @apply grid grid-cols-1 gap-4 md:grid-cols-3;
+  }
+
+  .modal-footer-actions {
+    @apply flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end;
+  }
+
   /* Onboarding Background */
   .onboarding-bg {
     background-image: radial-gradient(circle at 60% 20%, #dbeafe 0%, transparent 50%), radial-gradient(circle at 20% 80%, #f0fdf4 0%, transparent 50%);

@@ -105,9 +105,9 @@ export default function Layout() {
                       initial={{ opacity: 0, y: 12, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 12, scale: 0.95 }}
-                      className="absolute right-0 mt-3 w-[320px] bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-outline-variant z-[70] overflow-hidden"
+                      className="absolute right-0 mt-3 w-[320px] overflow-hidden rounded-lg border border-outline-variant bg-white shadow-[0_20px_50px_rgba(15,23,42,0.16)] z-[70]"
                     >
-                      <div className="p-4 border-b border-outline-variant flex justify-between items-center bg-slate-50/50">
+                      <div className="flex items-center justify-between border-b border-outline-variant bg-surface-container-low p-4">
                         <h3 className="font-bold text-slate-900 text-sm">Notificações</h3>
                         {unreadCount > 0 && (
                           <button 
@@ -121,7 +121,7 @@ export default function Layout() {
                           </button>
                         )}
                       </div>
-                      <div className="max-h-[380px] overflow-y-auto">
+                      <div className="max-h-[380px] overflow-y-auto bg-surface">
                         {myNotifications.length === 0 ? (
                           <div className="py-12 px-6 text-center text-slate-400">
                             <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -164,7 +164,7 @@ export default function Layout() {
                         )}
                       </div>
                       {myNotifications.length > 0 && (
-                         <div className="p-3 bg-slate-50/50 border-t border-outline-variant text-center">
+                         <div className="border-t border-outline-variant bg-surface-container-low p-3 text-center">
                             <button className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-600">
                                Ver histórico completo
                             </button>

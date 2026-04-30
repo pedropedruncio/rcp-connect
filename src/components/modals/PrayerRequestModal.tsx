@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { X, Send, Heart, User } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { Heart, Send, User } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { ModalShell } from '../ui/ModalShell';
 
 interface PrayerRequestModalProps {
   isOpen: boolean;
@@ -20,10 +20,10 @@ export default function PrayerRequestModal({ isOpen, onClose, onSuccess }: Praye
     wantsContact: false
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     if (!user) return;
-    
+
     setIsSubmitting(true);
     try {
       await addPrayerRequest({
@@ -42,80 +42,68 @@ export default function PrayerRequestModal({ isOpen, onClose, onSuccess }: Praye
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-          />
-          
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col"
-          >
-            {/* Header */}
-            <div className="p-6 border-b border-outline-variant flex items-center justify-between bg-surface-container-low">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gold/10 rounded-lg">
-                  <Heart className="w-5 h-5 text-gold" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900">Pedido de Oração</h3>
-                  <p className="text-sm text-slate-500">A sua igreja está aqui para orar por si.</p>
-                </div>
-              </div>
-              <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form id="prayer-form" onSubmit={handleSubmit} className="p-8 space-y-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Assunto / Motivo</label>
-                <input 
-                  required type="text" 
-                  value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})}
-                  className="input-heritage" placeholder="Ex: Saúde, Família, Trabalho..."
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Descrição do Pedido</label>
-                <textarea 
-                  required
-                  value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}
-                  className="input-heritage min-h-[120px] py-3 text-sm" placeholder="Escreva aqui o seu motivo de oração detalhado..."
-                />
-              </div>
-
-              <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-outline-variant">
-                <input 
-                  type="checkbox" id="contact"
-                  checked={formData.wantsContact} onChange={e => setFormData({...formData, wantsContact: e.target.checked})}
-                  className="w-4 h-4 text-gold border-outline-variant rounded focus:ring-gold"
-                />
-                <label htmlFor="contact" className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                  <User className="w-4 h-4 text-slate-400" /> Desejo ser contactado por um Pastor / Líder.
-                </label>
-              </div>
-            </form>
-
-            <div className="p-6 border-t border-outline-variant flex items-center justify-end gap-3 bg-surface-container-low">
-              <button onClick={onClose} className="px-6 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-md transition-all">
-                Cancelar
-              </button>
-              <button type="submit" form="prayer-form" disabled={isSubmitting} className="btn-primary-heritage px-8 flex items-center gap-2 disabled:opacity-50">
-                <Send className="w-4 h-4" /> 
-                {isSubmitting ? 'A enviar...' : 'Enviar Pedido'}
-              </button>
-            </div>
-          </motion.div>
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Pedido de oração"
+      description="A sua igreja está aqui para orar por si."
+      icon={<Heart className="h-5 w-5" />}
+      size="md"
+      footer={(
+        <div className="modal-footer-actions">
+          <button type="button" onClick={onClose} className="btn-secondary-heritage">
+            Cancelar
+          </button>
+          <button type="submit" form="prayer-form" disabled={isSubmitting} className="btn-primary-heritage flex items-center gap-2">
+            <Send className="h-4 w-4" />
+            {isSubmitting ? 'A enviar...' : 'Enviar pedido'}
+          </button>
         </div>
       )}
-    </AnimatePresence>
+    >
+      <form id="prayer-form" onSubmit={handleSubmit} className="space-y-5">
+        <section className="modal-section">
+          <div className="modal-field">
+            <label className="modal-label">Assunto / motivo</label>
+            <input
+              required
+              type="text"
+              value={formData.subject}
+              onChange={(event) => setFormData({ ...formData, subject: event.target.value })}
+              className="input-heritage"
+              placeholder="Ex: Saúde, Família, Trabalho..."
+            />
+          </div>
+
+          <div className="modal-field mt-4">
+            <label className="modal-label">Descrição do pedido</label>
+            <textarea
+              required
+              value={formData.description}
+              onChange={(event) => setFormData({ ...formData, description: event.target.value })}
+              className="input-heritage"
+              placeholder="Escreva aqui o seu motivo de oração detalhado..."
+            />
+          </div>
+        </section>
+
+        <label className="flex cursor-pointer items-start gap-3 rounded-md border border-outline-variant bg-white p-4 transition-colors hover:border-gold">
+          <input
+            type="checkbox"
+            checked={formData.wantsContact}
+            onChange={(event) => setFormData({ ...formData, wantsContact: event.target.checked })}
+            className="mt-0.5 h-4 w-4 rounded border-outline-variant text-gold focus:ring-gold"
+          />
+          <span className="min-w-0">
+            <span className="flex items-center gap-2 text-sm font-bold text-slate-800">
+              <User className="h-4 w-4 text-slate-400" /> Desejo ser contactado
+            </span>
+            <span className="mt-1 block text-xs leading-5 text-slate-500">
+              Um pastor ou líder pode entrar em contacto para acompanhar este pedido.
+            </span>
+          </span>
+        </label>
+      </form>
+    </ModalShell>
   );
 }

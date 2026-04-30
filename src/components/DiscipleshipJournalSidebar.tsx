@@ -54,23 +54,26 @@ export default function DiscipleshipJournalSidebar({ isOpen, onClose, pair }: Di
           <motion.div 
             initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-[110] flex flex-col border-l border-outline-variant"
+            className="fixed right-0 top-0 z-[110] flex h-full w-full max-w-lg flex-col border-l border-outline-variant bg-white shadow-[0_24px_80px_rgba(15,23,42,0.22)]"
           >
-            <div className="flex items-center justify-between p-6 border-b border-outline-variant bg-surface-container-low">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-50 rounded-lg">
+            <div className="flex items-start justify-between gap-4 border-b border-outline-variant bg-surface-container-low px-5 py-4 sm:px-6 sm:py-5">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-blue-50">
                   <BookOpen className="w-5 h-5 text-blue-600" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 tracking-tight">Diário de Discipulado</h3>
+                <div>
+                  <h3 className="text-xl font-bold leading-tight text-slate-900">Diário de Discipulado</h3>
+                  <p className="mt-1 text-sm leading-5 text-slate-500">Histórico de encontros e notas pastorais.</p>
+                </div>
               </div>
-              <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+              <button onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-white hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-gold/35">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-surface">
+            <div className="flex-1 overflow-y-auto bg-surface px-5 py-5 sm:px-6 sm:py-6 space-y-5">
               {/* Header Info */}
-              <div className="flex flex-col gap-1 text-center items-center justify-center p-6 bg-surface-container-high rounded-xl border border-outline-variant">
+              <div className="modal-section flex flex-col gap-1 text-center items-center justify-center">
                  <div className="flex -space-x-3 mb-2">
                     <div className="w-12 h-12 rounded-full border-2 border-white bg-gold/10 flex items-center justify-center text-gold font-bold overflow-hidden">
                       {mentor?.avatarUrl ? <img src={mentor.avatarUrl} alt="" className="w-full h-full object-cover"/> : mentor?.firstName?.[0]}
@@ -88,8 +91,8 @@ export default function DiscipleshipJournalSidebar({ isOpen, onClose, pair }: Di
               </div>
 
               {/* Histórico Real */}
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Histórico de Encontros</h4>
+              <div className="modal-section">
+                <h4 className="modal-section-title">Histórico de encontros</h4>
                 <div className="space-y-6">
                   {pairJournals.length > 0 ? (
                     pairJournals.map((journal) => (
@@ -107,7 +110,7 @@ export default function DiscipleshipJournalSidebar({ isOpen, onClose, pair }: Di
                               {new Intl.DateTimeFormat('pt-PT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(journal.createdAt))}
                             </p>
                           </div>
-                          <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm text-slate-700 whitespace-pre-wrap shadow-sm">
+                          <div className="p-3 bg-slate-50 rounded-md border border-slate-100 text-sm text-slate-700 whitespace-pre-wrap shadow-sm">
                             {journal.content}
                           </div>
                         </div>
@@ -139,18 +142,18 @@ export default function DiscipleshipJournalSidebar({ isOpen, onClose, pair }: Di
             </div>
 
             {canAddNote && (
-              <div className="p-6 border-t border-outline-variant bg-white">
+              <div className="border-t border-outline-variant bg-surface-container-low px-5 py-4 sm:px-6">
                 <div className="relative group">
                   <textarea
                     value={newNote}
                     onChange={(e) => setNewNote(e.target.value)}
                     placeholder="Escreva uma nota sobre o encontro..."
-                    className="w-full p-4 pr-12 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-gold/20 focus:border-gold outline-none resize-none transition-all min-h-[100px] group-hover:bg-white"
+                    className="input-heritage min-h-[104px] pr-12"
                   />
                   <button 
                     onClick={handleAddNote}
                     disabled={isSubmitting || !newNote.trim()}
-                    className="absolute bottom-3 right-3 p-2 bg-gold text-white rounded-lg hover:bg-gold-dark disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-gold/20"
+                    className="absolute bottom-3 right-3 rounded-md bg-gold p-2 text-white shadow-md shadow-gold/20 transition-all hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Send className="w-4 h-4" />}
                   </button>
