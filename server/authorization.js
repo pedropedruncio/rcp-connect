@@ -342,5 +342,11 @@ export async function assertMutationPermission({ client, authUser, method, resou
     return;
   }
 
+  if (resource === 'notifications') {
+    if (method !== 'POST') throw httpError(404, 'Endpoint não encontrado.');
+    // Authenticated users can manage their own notifications (read/read-all)
+    return;
+  }
+
   throw httpError(404, 'Endpoint não encontrado.');
 }

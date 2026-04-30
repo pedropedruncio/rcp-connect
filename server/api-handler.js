@@ -969,25 +969,36 @@ async function handleMutation(client, authUser, method, path, body) {
   }
 
   if (resource === 'notifications' && method === 'POST') {
-    const personId = await getPersonIdFromUser(client, authUser.id);
-    
+    const personId = await getCurrentPersonId(client, authUser);
+    const dataClient = createPrivilegedClient() ?? client;
+
     if (path.endsWith('/read-all')) {
-      // Get all notifications the user can see and haven't read
-      const { data: list } = await client.from('SystemNotification').select('id, readBy');
+      const { data: list, error: fetchError } = await dataClient
+        .from('SystemNotification')
+        .select('id, readBy')
+        .not('readBy', 'cs', `{${personId}}`);
+
+      if (fetchError) throw fetchError;
+
       for (const item of list) {
-        if (!item.readBy?.includes(personId)) {
-          const newReadBy = [...(item.readBy || []), personId];
-          await client.from('SystemNotification').update({ readBy: newReadBy }).eq('id', item.id);
-        }
+        const newReadBy = [...(item.readBy || []), personId];
+        await dataClient.from('SystemNotification').update({ readBy: newReadBy }).eq('id', item.id);
       }
       return;
     }
-    
+
     if (id && path.endsWith('/read')) {
-      const { data: notification } = await client.from('SystemNotification').select('readBy').eq('id', id).single();
+      const { data: notification, error: fetchError } = await dataClient
+        .from('SystemNotification')
+        .select('readBy')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
       if (notification && !notification.readBy?.includes(personId)) {
         const newReadBy = [...(notification.readBy || []), personId];
-        await client.from('SystemNotification').update({ readBy: newReadBy }).eq('id', id);
+        await dataClient.from('SystemNotification').update({ readBy: newReadBy }).eq('id', id);
       }
       return;
     }
@@ -1398,8 +1409,8 @@ export async function handler(event) {
     return json(200, { ok: true }, auth.cookies);
   } catch (error) {
     console.error(error);
-    return json(error.statusCode ?? 500, {
-      error: error.message ?? 'Erro interno.',
-    });
+    const statusCode = error.statusCode ?? 500;
+    const message = statusCode === 500 ? 'Erro interno no servidor.' : (error.message ?? 'Erro interno.');
+    return json(statusCode, { error: message });
   }
 }
