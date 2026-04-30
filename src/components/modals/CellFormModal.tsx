@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Network, Save, X } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
+import { useAuth } from '../../contexts/AuthContext';
 import type { CellGroup, CellInput } from '../../types/domain';
 
 interface CellFormModalProps {
@@ -14,7 +15,9 @@ interface CellFormModalProps {
 const LEADER_ROLES = new Set(['Líder de Célula', 'Discipulador', 'Pastor', 'Administrador']);
 
 export default function CellFormModal({ isOpen, onClose, onSuccess, initialData }: CellFormModalProps) {
+  const { user } = useAuth();
   const { addCell, campuses, persons, updateCell } = useData();
+  const isLeader = user?.role === 'LEADER' && !['ADMIN', 'PASTOR'].includes(user.role);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<CellInput>({
     name: '',
@@ -97,9 +100,10 @@ export default function CellFormModal({ isOpen, onClose, onSuccess, initialData 
                 <input
                   required
                   type="text"
+                  disabled={isLeader}
                   value={formData.name}
                   onChange={(event) => setFormData((current) => ({ ...current, name: event.target.value }))}
-                  className="input-heritage"
+                  className="input-heritage disabled:opacity-50"
                 />
               </div>
 
@@ -108,9 +112,10 @@ export default function CellFormModal({ isOpen, onClose, onSuccess, initialData 
                   <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Líder responsável</label>
                   <select
                     required
+                    disabled={isLeader}
                     value={formData.leaderId}
                     onChange={(event) => setFormData((current) => ({ ...current, leaderId: event.target.value }))}
-                    className="input-heritage"
+                    className="input-heritage disabled:opacity-50"
                   >
                     <option value="">Selecionar...</option>
                     {leaders.map((person) => (
@@ -124,9 +129,10 @@ export default function CellFormModal({ isOpen, onClose, onSuccess, initialData 
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Campus</label>
                   <select
+                    disabled={isLeader}
                     value={formData.campusId ?? ''}
                     onChange={(event) => setFormData((current) => ({ ...current, campusId: event.target.value || null }))}
-                    className="input-heritage"
+                    className="input-heritage disabled:opacity-50"
                   >
                     <option value="">Sem campus</option>
                     {campuses.map((campus) => (
@@ -165,9 +171,10 @@ export default function CellFormModal({ isOpen, onClose, onSuccess, initialData 
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Saúde</label>
                   <select
+                    disabled={isLeader}
                     value={formData.health}
                     onChange={(event) => setFormData((current) => ({ ...current, health: event.target.value as CellInput['health'] }))}
-                    className="input-heritage"
+                    className="input-heritage disabled:opacity-50"
                   >
                     <option value="EXCELENTE">EXCELENTE</option>
                     <option value="ESTÁVEL">ESTÁVEL</option>

@@ -1,19 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import { 
   Network, Search, Plus, MoreVertical, Users, MapPin, Clock,
-  ChevronRight, TrendingUp, AlertTriangle, CheckCircle2
+  ChevronRight, TrendingUp, AlertTriangle, CheckCircle2, ArrowLeft, Calendar, FileText
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { motion } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { useData } from '../contexts/DataContext';
+import { Link } from 'react-router-dom';
 import CellFormModal from '../components/modals/CellFormModal';
+import PrayerRequestModal from '../components/modals/PrayerRequestModal';
+import TraineeManagementModal from '../components/modals/TraineeManagementModal';
 import Toast from '../components/ui/Toast';
 import type { CellGroup } from '../types/domain';
-
-// Fake detail view embedded
-import { ArrowLeft, Calendar, FileText } from 'lucide-react';
 
 const HEALTH_CONFIG = {
   EXCELENTE: { color: 'bg-green-100 text-green-700', icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
@@ -25,9 +25,12 @@ export default function Celulas() {
   const { user } = useAuth();
   const p = usePermissions();
 
-  const { persons, cells, getPersonById } = useData();
+  const { persons, cells, getPersonById, prayerRequests, addPrayerRequest, updatePrayerRequest } = useData();
   const [selectedCell, setSelectedCell] = useState<CellGroup | null>(null);
   const [isModalOpen, setModalOpen] = useState(false);
+  const [isPrayerModalOpen, setPrayerModalOpen] = useState(false);
+  const [isTraineeModalOpen, setTraineeModalOpen] = useState(false);
+  const [prFilter, setPrFilter] = useState<'ALL' | 'PENDING' | 'ANSWERED'>('PENDING');
   const [editingCell, setEditingCell] = useState<any>(null);
   const [toast, setToast] = useState<{show: boolean, msg: string}>({ show: false, msg: '' });
 
@@ -64,6 +67,9 @@ export default function Celulas() {
 
   if (selectedCell) {
     const leader = getPersonById(selectedCell.leaderId);
+    const cellPrayerRequests = prayerRequests.filter(pr => selectedCell.memberIds.includes(pr.personId));
+    const filteredPrs = cellPrayerRequests.filter(pr => prFilter === 'ALL' || pr.status === prFilter);
+
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-6">
         <button 
@@ -95,16 +101,81 @@ export default function Celulas() {
              <div className="space-y-3">
                 <div className="p-4 bg-surface-container-high rounded-md flex justify-between items-center border border-outline-variant">
                   <div className="flex items-center gap-3"><Calendar className="w-4 h-4 text-gold"/> <span className="text-sm font-bold text-slate-800">Próximo Encontro</span></div>
-                  <span className="text-xs text-slate-500">Nesta quinta-feira às 20:00</span>
+                  <span className="text-xs text-slate-500">{selectedCell.day} às {selectedCell.time}</span>
                 </div>
                 <div className="p-4 bg-surface-container-high rounded-md flex justify-between items-center border border-outline-variant">
-                  <div className="flex items-center gap-3"><Users className="w-4 h-4 text-gold"/> <span className="text-sm font-bold text-slate-800">Membros Associados</span></div>
+                  <div className="flex items-center gap-3"><Users className="w-4 h-4 text-gold"/> <span className="text-sm font-bold text-slate-800">Membros da Célula</span></div>
                   <span className="text-xs text-slate-500">{selectedCell.memberIds.length} Pessoas</span>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {persons.filter(p => selectedCell.memberIds.includes(p.id)).map(member => (
+                    <div key={member.id} className="flex items-center justify-between p-3 bg-surface rounded-md border border-outline-variant/50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                          {member.name.split(' ').map(n => n[0]).join('')}
+                        </div>
+                        <span className="text-sm font-medium text-slate-700">{member.name}</span>
+                      </div>
+                      <Link to={`/pessoas/${member.id}`} className="text-[10px] font-bold text-gold hover:underline uppercase tracking-widest">Perfil</Link>
+                    </div>
+                  ))}
                 </div>
              </div>
              
-             <h3 className="text-lg font-bold mt-8 mb-4">Pedidos de Oração Recentes</h3>
-             <p className="text-sm text-slate-500">Nenhum pedido aberto da célula de momento.</p>
+             <div className="flex items-center justify-between mt-8 mb-4">
+                <h3 className="text-lg font-bold">Pedidos de Oração</h3>
+                <div className="flex items-center gap-2">
+                  <div className="flex bg-slate-100 p-0.5 rounded-md">
+                    {(['PENDING', 'ANSWERED', 'ALL'] as const).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setPrFilter(f)}
+                        className={cn(
+                          "px-2 py-1 text-[9px] font-bold rounded transition-all uppercase tracking-wider",
+                          prFilter === f ? "bg-white text-gold shadow-sm" : "text-slate-400 hover:text-slate-600"
+                        )}
+                      >
+                        {f === 'PENDING' ? 'Pendentes' : f === 'ANSWERED' ? 'Graças' : 'Todos'}
+                      </button>
+                    ))}
+                  </div>
+                  <button 
+                    onClick={() => setPrayerModalOpen(true)}
+                    className="ml-2 text-[10px] font-bold text-gold hover:underline uppercase tracking-widest"
+                  >
+                    Novo
+                  </button>
+                </div>
+             </div>
+
+             {filteredPrs.length > 0 ? (
+               <div className="space-y-3">
+                 {filteredPrs.map(pr => {
+                    const requester = getPersonById(pr.personId);
+                    return (
+                      <div key={pr.id} className="p-3 bg-surface rounded-md border border-outline-variant/50">
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">{requester?.name}</span>
+                          <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded', pr.status === 'PENDING' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700')}>
+                            {pr.status === 'PENDING' ? 'PEDIDO' : 'RESPONDIDO'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-700">{pr.request}</p>
+                        {pr.status === 'PENDING' && (p.isGlobalScope || user?.id === selectedCell.leaderId) && (
+                          <button 
+                            onClick={() => updatePrayerRequest(pr.id, { status: 'ANSWERED' })}
+                            className="mt-2 text-[9px] font-bold text-gold hover:underline uppercase"
+                          >
+                            Marcar como Respondido
+                          </button>
+                        )}
+                      </div>
+                    )
+                 })}
+               </div>
+             ) : (
+               <p className="text-sm text-slate-500">Nenhum pedido encontrado com este filtro.</p>
+             )}
           </div>
 
           <div className="card-heritage p-6">
@@ -114,7 +185,17 @@ export default function Celulas() {
                 <p className="text-sm font-bold text-slate-800">{leader?.name ?? '—'}</p>
              </div>
              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Líderes em Treino</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Líderes em Treino</p>
+                {(p.isGlobalScope || user?.id === selectedCell.leaderId) && (
+                  <button 
+                    onClick={() => setTraineeModalOpen(true)}
+                    className="text-[10px] font-bold text-gold hover:underline uppercase tracking-widest"
+                  >
+                    Gerir
+                  </button>
+                )}
+              </div>
                 {selectedCell.traineeLeaderIds.length > 0 ? (
                   <ul className="text-sm text-slate-600 space-y-2">
                     {selectedCell.traineeLeaderIds.map(id => {
@@ -168,7 +249,7 @@ export default function Celulas() {
       {!isLeaderOnly && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: 'Células',          value: scopedCells.length, sub: 'no seu scope' },
+            { label: 'Células',          value: scopedCells.length, sub: 'no seu âmbito' },
             { label: 'Membros',          value: totalMembers,       sub: 'em grupos' },
             { label: 'Em Formação',      value: totalTrainees,      sub: 'líderes candidatos' },
             { label: 'Requerem Atenção', value: needsAttention,     sub: 'a monitorizar' },
@@ -220,7 +301,7 @@ export default function Celulas() {
                     </p>
                   </div>
                 </div>
-                {p.canAddCell && (
+                {(p.canAddCell || (user?.role === 'LEADER' && cell.leaderId === user?.id)) && (
                   <button 
                     onClick={() => handleEdit(cell)}
                     className="p-1.5 text-slate-300 hover:text-slate-700 rounded-md hover:bg-surface-container-high transition-all"
@@ -290,6 +371,20 @@ export default function Celulas() {
         initialData={editingCell}
         onSuccess={() => setToast({ show: true, msg: 'Operação realizada com sucesso!' })}
       />
+
+      <PrayerRequestModal
+        isOpen={isPrayerModalOpen}
+        onClose={() => setPrayerModalOpen(false)}
+        onSuccess={(msg) => setToast({ show: true, msg })}
+      />
+
+      {selectedCell && (
+        <TraineeManagementModal
+          isOpen={isTraineeModalOpen}
+          onClose={() => setTraineeModalOpen(false)}
+          cell={selectedCell}
+        />
+      )}
 
       <Toast 
         isVisible={toast.show}

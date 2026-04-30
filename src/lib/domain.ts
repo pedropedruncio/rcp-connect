@@ -13,8 +13,10 @@ import type {
   Person,
   PersonRole,
   PersonStatus,
+  PrayerRequest,
   RoleRecord,
   Schedule,
+  SystemNotification,
   UserRecord,
 } from '../types/domain';
 
@@ -96,4 +98,6 @@ export interface DomainState {
   schedules: Schedule[];
   preferences: NotificationPreference[];
   settings: AppSetting[];
+  prayerRequests: PrayerRequest[];
+  notifications: SystemNotification[];
 }

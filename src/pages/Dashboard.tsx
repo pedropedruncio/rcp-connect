@@ -122,7 +122,7 @@ export default function Dashboard() {
         ]
       : [
           { label: 'Minha célula', value: dashboardCell?.name ?? 'Sem célula', icon: Network },
-          { label: 'Pessoas no meu scope', value: scopedPeople.length, icon: Users },
+          { label: 'Pessoas no meu âmbito', value: scopedPeople.length, icon: Users },
           { label: 'Discipulado ativo', value: scopedPairs.length, icon: BookOpen },
           { label: 'Acompanhamentos abertos', value: scopedFollowUps.filter((item) => item.status !== 'Concluído').length, icon: HeartHandshake },
         ];

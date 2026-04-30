@@ -31,6 +31,7 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
     role: 'MEMBER',
     address: '',
     birthdate: '',
+    baptismDate: '',
     notes: '',
     avatarUrl: null,
   });
@@ -60,6 +61,7 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
                 : 'MEMBER',
       address: initialData?.address ?? '',
       birthdate: initialData?.birthdate ?? '',
+      baptismDate: initialData?.baptismDate ?? '',
       notes: initialData?.notes ?? '',
       avatarUrl: initialData?.avatarUrl ?? null,
     });
@@ -249,6 +251,15 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
                     type="date"
                     value={formData.birthdate ?? ''}
                     onChange={(event) => setFormData((current) => ({ ...current, birthdate: event.target.value }))}
+                    className="input-heritage"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Batismo</label>
+                  <input
+                    type="date"
+                    value={formData.baptismDate ?? ''}
+                    onChange={(event) => setFormData((current) => ({ ...current, baptismDate: event.target.value }))}
                     className="input-heritage"
                   />
                 </div>

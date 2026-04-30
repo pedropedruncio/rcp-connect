@@ -29,6 +29,7 @@ export default function MeuPerfil() {
     addFollowUp,
     persons,
     updatePerson,
+    prayerRequests,
   } = useData();
   const [isEditModalOpen, setEditModalOpen] = React.useState(false);
   const [isPrayerModalOpen, setPrayerModalOpen] = React.useState(false);
@@ -52,45 +53,11 @@ export default function MeuPerfil() {
     persons.find((item) => item.role === 'Discipulador') ||
     cellLeader;
 
-  const handlePrayerRequest = async (data: { request: string; isPrivate: boolean }) => {
-    if (!primaryResponsible) {
-      setToast({
-        show: true,
-        msg: 'Ainda não existe um responsável elegível para receber este pedido.',
-        type: 'error',
-      });
-      return;
-    }
-
-    try {
-      await addFollowUp({
-        personId: user.id,
-        responsibleId: primaryResponsible.id,
-        type: 'Mensagem',
-        priority: data.isPrivate ? 'Alta' : 'Média',
-        status: 'Pendente',
-        notes: data.request,
-        date: new Date().toISOString().slice(0, 10),
-        cellId: cell?.id ?? null,
-      });
-
-      setToast({
-        show: true,
-        msg: 'Pedido de oração registado e encaminhado para acompanhamento.',
-        type: 'success',
-      });
-    } catch (error: any) {
-      setToast({
-        show: true,
-        msg: error?.message ?? 'Não foi possível registar o pedido de oração.',
-        type: 'error',
-      });
-    }
-  };
+  const myPrayerRequests = prayerRequests.filter(pr => pr.personId === user.id);
 
   const avatarUrl = person?.avatarUrl ?? user.avatarUrl ?? null;
 
-  const handleProfileUpdate = async (data: { phone: string; address: string; avatarImage?: string }) => {
+  const handleProfileUpdate = async (data: { phone: string; address: string; baptismDate?: string; avatarImage?: string }) => {
     if (!person) return;
 
     try {
@@ -107,6 +74,7 @@ export default function MeuPerfil() {
       await updatePerson(user.id, {
         phone: data.phone,
         address: data.address,
+        baptismDate: data.baptismDate,
         ...(uploadedAvatarUrl ? { avatarUrl: uploadedAvatarUrl } : {}),
       });
       setToast({ show: true, msg: 'Os seus dados foram atualizados com sucesso.', type: 'success' });
@@ -132,7 +100,7 @@ export default function MeuPerfil() {
       <PrayerRequestModal
         isOpen={isPrayerModalOpen}
         onClose={() => setPrayerModalOpen(false)}
-        onSubmit={handlePrayerRequest}
+        onSuccess={(msg) => setToast({ show: true, msg, type: 'success' })}
       />
 
       <Toast
@@ -200,6 +168,7 @@ export default function MeuPerfil() {
                 },
                 { icon: MapPin, label: 'Campus', value: person?.campus || user.campus },
                 { icon: Calendar, label: 'Membro desde', value: person?.since || '—' },
+                { icon: Calendar, label: 'Batismo', value: person?.baptismDate || 'Não registado' },
               ].map(({ icon: Icon, label, value }) => (
                 <div key={label} className="flex items-start gap-3">
                   <Icon className="mt-0.5 h-4 w-4 flex-shrink-0 text-gold" />
@@ -239,6 +208,43 @@ export default function MeuPerfil() {
                 </div>
               ) : (
                 <p className="text-sm italic text-slate-400">Ainda não está atribuído a nenhuma célula.</p>
+              )}
+            </div>
+
+            <div className="card-heritage p-6">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="rounded-lg bg-gold/10 p-2.5">
+                  <Heart className="h-5 w-5 text-gold" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Pedidos de Oração</h3>
+                  <p className="text-xs text-slate-400">Os seus pedidos enviados à liderança.</p>
+                </div>
+              </div>
+
+              {myPrayerRequests.length === 0 ? (
+                <p className="text-sm italic text-slate-400">Ainda não enviou pedidos de oração.</p>
+              ) : (
+                <div className="space-y-3">
+                  {myPrayerRequests.map((pr) => (
+                    <div key={pr.id} className="rounded-lg border border-outline-variant bg-surface-container-high p-4">
+                      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-slate-800">{pr.request}</p>
+                          <p className="text-[10px] text-slate-500 mt-1">
+                            {new Date(pr.createdAt).toLocaleDateString('pt-PT')} às {new Date(pr.createdAt).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                        <span className={cn(
+                          "badge-heritage",
+                          pr.status === 'PENDING' ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"
+                        )}>
+                          {pr.status === 'PENDING' ? 'Pendente' : 'Respondido'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 

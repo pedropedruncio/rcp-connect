@@ -24,6 +24,7 @@ const MEMBER_SAFE_PERSON_FIELDS = new Set([
   'phone',
   'address',
   'birthdate',
+  'baptismDate',
   'avatarUrl',
   'campusId',
 ]);
@@ -219,7 +220,7 @@ export async function assertMutationPermission({ client, authUser, method, resou
       return;
     }
 
-    throw forbidden('Só pode gerir discipulados dentro do seu escopo.');
+    throw forbidden('Só pode gerir discipulados dentro do seu âmbito.');
   }
 
   if (resource === 'follow-ups') {
@@ -246,7 +247,7 @@ export async function assertMutationPermission({ client, authUser, method, resou
       return;
     }
 
-    throw forbidden('Só pode gerir follow-ups dentro do seu escopo.');
+    throw forbidden('Só pode gerir follow-ups dentro do seu âmbito.');
   }
 
   if (resource === 'families') {
@@ -287,6 +288,32 @@ export async function assertMutationPermission({ client, authUser, method, resou
       throw forbidden('Não pode alterar preferências de outra pessoa.');
     }
 
+    return;
+  }
+
+  if (resource === 'prayer-requests') {
+    if (!['POST', 'PATCH', 'DELETE'].includes(method)) {
+      throw httpError(404, 'Endpoint não encontrado.');
+    }
+
+    if (method === 'POST') {
+      if (body.personId === authUser.id) return;
+      if (canManagePerson(authUser, body.personId)) return;
+      throw forbidden('Só pode criar pedidos de oração para si ou para os seus liderados.');
+    }
+
+    if ((method === 'PATCH' || method === 'DELETE') && id) {
+      const { data: request, error } = await client
+        .from('PrayerRequest')
+        .select('personId')
+        .eq('id', id)
+        .single();
+      
+      if (error || !request) throw forbidden('Pedido de oração não encontrado.');
+      if (request.personId === authUser.id) return;
+      if (canManagePerson(authUser, request.personId)) return;
+      throw forbidden('Não tem permissão para gerir este pedido de oração.');
+    }
     return;
   }
 

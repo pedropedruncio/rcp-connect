@@ -53,6 +53,7 @@ export interface Person {
   since: string;
   address?: string;
   birthdate?: string;
+  baptismDate?: string;
   notes?: string;
   avatarUrl?: string | null;
 }
@@ -149,6 +150,22 @@ export interface Schedule {
   volunteerIds: string[];
 }
 
+export interface PrayerRequest {
+  id: string;
+  personId: string;
+  request: string;
+  status: 'PENDING' | 'ANSWERED';
+  createdAt: string;
+}
+
+export interface SystemNotification {
+  id: string;
+  type: string;
+  content: any;
+  readBy: string[];
+  createdAt: string;
+}
+
 export interface NotificationPreference {
   id?: string;
   personId: string;
@@ -169,7 +186,7 @@ export type PersonInput = Omit<Person, 'id' | 'name' | 'campus' | 'role'> & {
   role: Role;
 };
 
-export type CellInput = Omit<CellGroup, 'id' | 'campus' | 'memberIds' | 'traineeLeaderIds' | 'disciplerId' | 'lastMeeting' | 'growth'> & {
+export type CellInput = Omit<CellGroup, 'id' | 'campus' | 'memberIds' | 'disciplerId' | 'lastMeeting' | 'growth'> & {
   id?: string;
 };
 
@@ -199,4 +216,8 @@ export type EventInput = Omit<EventItem, 'id' | 'campus' | 'attendeeIds'> & {
 export type ScheduleInput = Omit<Schedule, 'id' | 'volunteerIds'> & {
   id?: string;
   volunteerIds?: string[];
+};
+
+export type PrayerRequestInput = Omit<PrayerRequest, 'id' | 'createdAt'> & {
+  id?: string;
 };

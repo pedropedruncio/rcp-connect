@@ -53,7 +53,7 @@ export default function Discipulado() {
     ? Math.round(scopedPairs.reduce((s, dp) => s + dp.progress, 0) / scopedPairs.length)
     : 0;
 
-  const scopeSubtitle = p.isGlobalScope
+  const ambitoSubtitle = p.isGlobalScope
     ? 'Visão global de todos os pares de discipulado da rede.'
     : user?.role === 'DISCIPLER'
       ? 'Pares de discipulado nas células que supervisiona.'
@@ -65,7 +65,7 @@ export default function Discipulado() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-4xl font-bold text-slate-900 tracking-tight">Discipulado</h2>
-          <p className="text-slate-500 font-medium">{scopeSubtitle}</p>
+          <p className="text-slate-500 font-medium">{ambitoSubtitle}</p>
         </div>
         {p.canAddDiscipleship && (
           <button 
@@ -89,7 +89,7 @@ export default function Discipulado() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { icon: <Users           className="w-5 h-5 text-blue-600"  />, bg: 'bg-blue-50',   label: 'Pares Ativos',    value: scopedPairs.length,                 sub: 'no seu scope' },
+          { icon: <Users           className="w-5 h-5 text-blue-600"  />, bg: 'bg-blue-50',   label: 'Pares Ativos',    value: scopedPairs.length,                 sub: 'no seu âmbito' },
           { icon: <GraduationCap  className="w-5 h-5 text-amber-600" />, bg: 'bg-amber-50',  label: 'Progresso Médio', value: `${avgProgress}%`,                 sub: 'de conclusão' },
           { icon: <CheckCircle2   className="w-5 h-5 text-green-600" />, bg: 'bg-green-50',  label: 'Concluídos',      value: completedCount,                    sub: 'desde o início' },
         ].map((item, i) => (
@@ -118,7 +118,7 @@ export default function Discipulado() {
         {scopedPairs.length === 0 ? (
           <div className="card-heritage p-16 text-center text-slate-400">
             <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm font-medium">Não há pares de discipulado no seu scope.</p>
+            <p className="text-sm font-medium">Não há pares de discipulado no seu âmbito.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -191,6 +191,18 @@ export default function Discipulado() {
           </div>
         )}
       </div>
+      <DiscipleshipFormModal
+        isOpen={isFormOpen}
+        onClose={() => setFormOpen(false)}
+        initialData={selectedPair}
+        onSuccess={() => setToast({ show: true, msg: 'Par de discipulado guardado com sucesso.' })}
+      />
+
+      <Toast 
+        isVisible={toast.show}
+        message={toast.msg}
+        onClose={() => setToast(prev => ({ ...prev, show: false }))}
+      />
     </motion.div>
   );
 }

@@ -28,6 +28,7 @@ export default function Pessoas() {
 
   const { persons, cells, error, isLoading } = useData();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingPerson, setEditingPerson] = useState<Person | undefined>(undefined);
   const [toast, setToast] = useState<{show: boolean, msg: string}>({ show: false, msg: '' });
 
   // ── Scope: quais pessoas este utilizador pode ver ─────────────────────────
@@ -38,7 +39,7 @@ export default function Pessoas() {
     const supervisedCellIds = user.supervisedCellIds || [];
 
     if (user.role === 'DISCIPLER' || user.role === 'LEADER') {
-      // Leader scope: cells led by user + supervised cells
+      // Leader âmbito: cells led by user + supervised cells
       const leaderCellIds = cells
         .filter(c => c.leaderId === user.id || supervisedCellIds.includes(c.id))
         .map(c => c.id);
@@ -82,7 +83,7 @@ export default function Pessoas() {
 
   const clear = () => { setSearch(''); setCampus('Todos'); setStatus('Todos'); setPage(1); };
 
-  const scopeLabel = useMemo(() => {
+  const ambitoLabel = useMemo(() => {
     if (p.isGlobalScope)      return `${persons.length} pessoas — toda a congregação`;
     if (user?.role === 'DISCIPLER') return `${scopedPeople.length} pessoas — nas suas células`;
     if (user?.role === 'LEADER')    return `${scopedPeople.length} pessoas — na sua célula`;
@@ -95,7 +96,7 @@ export default function Pessoas() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-4xl font-bold text-slate-900 tracking-tight">Pessoas</h2>
-          <p className="text-slate-500 font-medium">{scopeLabel}</p>
+          <p className="text-slate-500 font-medium">{ambitoLabel}</p>
         </div>
         <div className="flex items-center gap-3">
           {p.canExportData && (
@@ -105,7 +106,10 @@ export default function Pessoas() {
           )}
           {p.canAddMember && (
             <button 
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => {
+                setEditingPerson(undefined);
+                setIsModalOpen(true);
+              }}
               className="btn-primary-heritage flex items-center gap-2"
             >
               <UserPlus className="w-4 h-4" /> 
@@ -223,7 +227,13 @@ export default function Pessoas() {
                   </td>
                   {p.canEditMember && (
                     <td className="px-8 py-4 text-right">
-                      <button className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-surface-container-high rounded-md transition-all">
+                      <button 
+                        onClick={() => {
+                          setEditingPerson(person);
+                          setIsModalOpen(true);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-surface-container-high rounded-md transition-all"
+                      >
                         <MoreVertical className="w-4 h-4" />
                       </button>
                     </td>
@@ -264,7 +274,8 @@ export default function Pessoas() {
       <PersonFormModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={(name) => setToast({ show: true, msg: `${name} cadastrado com sucesso!` })}
+        initialData={editingPerson}
+        onSuccess={(name) => setToast({ show: true, msg: `${name} processado com sucesso!` })}
       />
 
       <Toast 

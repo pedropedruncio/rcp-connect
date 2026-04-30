@@ -77,6 +77,11 @@ interface DataContextType extends DomainState {
   inviteFamilyMember: (targetPersonId: string, relationship: string, familyId?: string) => Promise<void>;
   acceptFamilyInvitation: (memberId: string) => Promise<void>;
   rejectFamilyInvitation: (memberId: string) => Promise<void>;
+  addPrayerRequest: (request: any) => Promise<void>;
+  updatePrayerRequest: (id: string, data: any) => Promise<void>;
+  deletePrayerRequest: (id: string) => Promise<void>;
+  markNotificationAsRead: (id: string) => Promise<void>;
+  markAllNotificationsAsRead: () => Promise<void>;
 }
 
 type PersonRow = {
@@ -87,6 +92,7 @@ type PersonRow = {
   phone: string | null;
   address: string | null;
   birthdate: string | null;
+  baptismDate: string | null;
   notes: string | null;
   avatarUrl: string | null;
   status: Person['status'] | null;
@@ -106,6 +112,7 @@ type CellRow = {
   location: string | null;
   campusId: string | null;
   health: CellGroup['health'] | null;
+  traineeLeaderIds: string[] | null;
 };
 
 type PairRow = {
@@ -177,6 +184,22 @@ type NotificationPreferenceRow = {
   smsEnabled: boolean | null;
 };
 
+type PrayerRequestRow = {
+  id: string;
+  personId: string;
+  request: string;
+  status: 'PENDING' | 'ANSWERED';
+  createdAt: string;
+};
+
+type SystemNotificationRow = {
+  id: string;
+  type: string;
+  content: any;
+  readBy: string[] | null;
+  createdAt: string;
+};
+
 const EMPTY_STATE: DomainState = {
   campuses: [],
   roles: [],
@@ -192,6 +215,8 @@ const EMPTY_STATE: DomainState = {
   schedules: [],
   preferences: [],
   settings: [],
+  prayerRequests: [],
+  notifications: [],
 };
 
 const DEFAULT_SUPPORTS: SchemaCapabilities = {
@@ -221,6 +246,8 @@ interface DataApiResponse {
   schedules: ScheduleRow[];
   preferences: NotificationPreferenceRow[];
   settings: AppSetting[];
+  prayerRequests: PrayerRequestRow[];
+  notifications: SystemNotificationRow[];
 }
 
 function splitName(name: string) {
@@ -254,6 +281,8 @@ function mapDomainState(
   scheduleRows: ScheduleRow[],
   preferenceRows: NotificationPreferenceRow[],
   settings: AppSetting[],
+  prayerRequestRows: PrayerRequestRow[],
+  notificationRows: SystemNotificationRow[],
 ): DomainState {
   const campusMap = new Map(campuses.map((campus) => [campus.id, campus.name]));
   const roleMap = new Map(roles.map((role) => [role.id, role.name]));
@@ -282,6 +311,7 @@ function mapDomainState(
       since: new Date().getFullYear().toString(),
       address: row.address ?? '',
       birthdate: row.birthdate ?? '',
+      baptismDate: row.baptismDate ?? '',
       notes: row.notes ?? '',
       avatarUrl: row.avatarUrl ?? null,
     };
@@ -296,9 +326,7 @@ function mapDomainState(
 
   const cells: CellGroup[] = cellRows.map((row) => {
     const memberIds = persons.filter((person) => person.cellId === row.id).map((person) => person.id);
-    const traineeLeaderIds = persons
-      .filter((person) => person.cellId === row.id && person.role === 'Líder em Formação')
-      .map((person) => person.id);
+    const traineeLeaderIds = row.traineeLeaderIds ?? [];
 
     return {
       id: row.id,
@@ -408,6 +436,22 @@ function mapDomainState(
     smsEnabled: row.smsEnabled ?? false,
   }));
 
+  const prayerRequests: any[] = prayerRequestRows.map((row) => ({
+    id: row.id,
+    personId: row.personId,
+    request: row.request,
+    status: row.status,
+    createdAt: row.createdAt,
+  }));
+
+  const notifications: SystemNotification[] = notificationRows.map((row) => ({
+    id: row.id,
+    type: row.type,
+    content: row.content,
+    readBy: row.readBy ?? [],
+    createdAt: row.createdAt,
+  }));
+
   return {
     campuses,
     roles,
@@ -423,6 +467,8 @@ function mapDomainState(
     schedules,
     preferences,
     settings,
+    prayerRequests,
+    notifications,
   };
 }
 
@@ -466,6 +512,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
           data.schedules,
           data.preferences,
           data.settings,
+          data.prayerRequests || [],
+          data.notifications || [],
         ),
       );
     } catch (currentError: any) {
@@ -521,6 +569,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         phone: data.phone ?? existing?.phone ?? null,
         address: data.address ?? existing?.address ?? null,
         birthdate: data.birthdate ?? existing?.birthdate ?? null,
+        baptismDate: data.baptismDate ?? existing?.baptismDate ?? null,
         notes: data.notes ?? existing?.notes ?? null,
         avatarUrl: data.avatarUrl ?? existing?.avatarUrl ?? null,
         status: data.status ?? existing?.status ?? 'VISITANTE',
@@ -537,6 +586,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ...(data.phone !== undefined ? { phone: data.phone } : {}),
           ...(data.address !== undefined ? { address: data.address } : {}),
           ...(data.birthdate !== undefined ? { birthdate: data.birthdate } : {}),
+          ...(data.baptismDate !== undefined ? { baptismDate: data.baptismDate } : {}),
           ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl } : {}),
           ...(data.campusId !== undefined ? { campusId: data.campusId } : {}),
         };
@@ -595,6 +645,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       ...(data.location ? { location: data.location } : {}),
       ...(data.campusId !== undefined ? { campusId: data.campusId } : {}),
       ...(data.health ? { health: data.health } : {}),
+      ...(data.traineeLeaderIds ? { traineeLeaderIds: data.traineeLeaderIds } : {}),
     };
 
     await apiRequest(`/cells/${encodeURIComponent(id)}`, {
@@ -823,6 +874,48 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await refetch();
   }, [refetch]);
 
+  const addPrayerRequest = useCallback(async (request: any) => {
+    await apiRequest('/prayer-requests', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: request.id ?? `pr_${crypto.randomUUID()}`,
+        personId: request.personId,
+        request: request.request,
+        status: request.status ?? 'PENDING',
+      }),
+    });
+    await refetch();
+  }, [refetch]);
+
+  const updatePrayerRequest = useCallback(async (id: string, data: any) => {
+    await apiRequest(`/prayer-requests/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    await refetch();
+  }, [refetch]);
+
+  const deletePrayerRequest = useCallback(async (id: string) => {
+    await apiRequest(`/prayer-requests/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    await refetch();
+  }, [refetch]);
+
+  const markNotificationAsRead = useCallback(async (id: string) => {
+    await apiRequest(`/notifications/${encodeURIComponent(id)}/read`, {
+      method: 'POST',
+    });
+    await refetch();
+  }, [refetch]);
+
+  const markAllNotificationsAsRead = useCallback(async () => {
+    await apiRequest('/notifications/read-all', {
+      method: 'POST',
+    });
+    await refetch();
+  }, [refetch]);
+
   const value = useMemo<DataContextType>(() => ({
     ...state,
     isLoading,
@@ -853,6 +946,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     inviteFamilyMember,
     acceptFamilyInvitation,
     rejectFamilyInvitation,
+    addPrayerRequest,
+    updatePrayerRequest,
+    deletePrayerRequest,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
   }), [
     addCell,
     addDiscipleshipPair,
@@ -883,6 +981,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     inviteFamilyMember,
     acceptFamilyInvitation,
     rejectFamilyInvitation,
+    addPrayerRequest,
+    updatePrayerRequest,
+    deletePrayerRequest,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
   ]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

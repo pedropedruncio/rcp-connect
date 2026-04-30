@@ -480,12 +480,14 @@ async function getData(client) {
     scheduleAssignmentsResult,
     preferencesResult,
     settingsResult,
+    prayerRequestsResult,
+    notificationsResult,
   ] = await Promise.all([
     client.from('Campus').select('id, name').order('name'),
     client.from('Role').select('id, name, description').order('name'),
     client.from('User').select('id, email, personId, roleId, supabaseId, createdAt'),
-    client.from('Person').select('id, firstName, lastName, email, phone, address, birthdate, notes, avatarUrl, status, campusId, cellGroupId'),
-    client.from('CellGroup').select('id, name, leaderId, day, time, location, campusId, health'),
+    client.from('Person').select('id, firstName, lastName, email, phone, address, birthdate, baptismDate, notes, avatarUrl, status, campusId, cellGroupId'),
+    client.from('CellGroup').select('id, name, leaderId, day, time, location, campusId, health, traineeLeaderIds'),
     client.from('DiscipleshipPair').select('id, mentorId, discipleId, course, progress, lastMeeting, startDate'),
     client.from('FollowUp').select('id, personId, responsibleId, type, date, status, priority, notes'),
     client.from('Family').select('id, name'),
@@ -498,6 +500,8 @@ async function getData(client) {
     optionalSelect(client, 'ScheduleAssignment', 'id'),
     optionalSelect(client, 'NotificationPreference', 'id, personId, pushEnabled, emailDigestEnabled, smsEnabled'),
     optionalSelect(client, 'AppSetting', 'id, settingKey, settingValue, scope'),
+    optionalSelect(client, 'PrayerRequest', 'id, personId, request, status, createdAt'),
+    optionalSelect(client, 'SystemNotification', 'id, type, content, readBy, createdAt'),
   ]);
 
   const requiredResults = [
@@ -539,6 +543,8 @@ async function getData(client) {
     schedules: scheduleResult.data ?? [],
     preferences: preferencesResult.data,
     settings: settingsResult.data,
+    prayerRequests: prayerRequestsResult.data,
+    notifications: notificationsResult.data,
   };
 }
 
@@ -848,6 +854,41 @@ async function updatePerson(client, authUser, id, payload) {
   }
 }
 
+async function notifyLeaderOfPrayerRequest(client, personId, prayerRequestId, requestText) {
+  try {
+    const { data: person, error: personErr } = await client
+      .from('Person')
+      .select('firstName, lastName, cellGroupId')
+      .eq('id', personId)
+      .single();
+    
+    if (personErr || !person?.cellGroupId) return;
+
+    const { data: cell, error: cellErr } = await client
+      .from('CellGroup')
+      .select('leaderId')
+      .eq('id', person.cellGroupId)
+      .single();
+
+    if (cellErr || !cell?.leaderId) return;
+
+    const privClient = createPrivilegedClient() ?? client;
+    await privClient.from('SystemNotification').insert({
+      id: `notif_${crypto.randomUUID()}`,
+      type: 'PRAYER_REQUEST',
+      content: {
+        message: `Novo pedido de oração de ${person.firstName}: "${requestText.slice(0, 50)}${requestText.length > 50 ? '...' : ''}"`,
+        personId,
+        prayerRequestId,
+        targetPersonId: cell.leaderId
+      },
+      readBy: []
+    });
+  } catch (err) {
+    console.warn('[notifyLeaderOfPrayerRequest] error:', err);
+  }
+}
+
 async function getCurrentPersonId(client, sbUser) {
   const { data, error } = await client
     .from('User')
@@ -874,7 +915,11 @@ async function handleMutation(client, authUser, method, path, body) {
   if (resource === 'people' && method === 'POST') return insertRow(client, 'Person', body);
   if (resource === 'people' && method === 'PATCH' && id) return updatePerson(client, authUser, id, body);
   if (resource === 'cells' && method === 'POST') return insertRow(client, 'CellGroup', body);
-  if (resource === 'cells' && method === 'PATCH' && id) return updateRow(client, 'CellGroup', id, body);
+  if (resource === 'cells' && method === 'PATCH' && id) {
+    const payload = { ...body };
+    // Ensure traineeLeaderIds is passed correctly if present
+    return updateRow(client, 'CellGroup', id, payload);
+  }
   if (resource === 'discipleship-pairs' && method === 'POST') return insertRow(client, 'DiscipleshipPair', body);
   if (resource === 'discipleship-pairs' && method === 'PATCH' && id) return updateRow(client, 'DiscipleshipPair', id, body);
   if (resource === 'follow-ups' && method === 'POST') return insertRow(client, 'FollowUp', body);
@@ -888,6 +933,59 @@ async function handleMutation(client, authUser, method, path, body) {
   if (resource === 'schedules' && method === 'POST') return insertRow(client, 'Schedule', body);
   if (resource === 'schedules' && method === 'PATCH' && id) return updateRow(client, 'Schedule', id, body);
   if (resource === 'notification-preferences' && method === 'PUT') return upsertRow(client, 'NotificationPreference', body);
+  if (resource === 'prayer-requests' && method === 'POST') {
+    const res = await insertRow(client, 'PrayerRequest', body);
+    await notifyLeaderOfPrayerRequest(client, body.personId, body.id, body.request);
+    return res;
+  }
+  if (resource === 'prayer-requests' && method === 'PATCH' && id) {
+    const res = await updateRow(client, 'PrayerRequest', id, body);
+    if (body.status === 'ANSWERED') {
+      const { data: pr } = await client.from('PrayerRequest').select('personId, request').eq('id', id).single();
+      if (pr) {
+        await client.from('SystemNotification').insert({
+          type: 'PRAYER_ANSWERED',
+          content: {
+            title: 'Oração Respondida',
+            message: `O seu pedido "${pr.request.slice(0, 30)}..." foi marcado como respondido pelo seu líder.`,
+            targetPersonId: pr.personId,
+            prayerRequestId: id
+          }
+        });
+      }
+    }
+    return res;
+  }
+  if (resource === 'prayer-requests' && method === 'DELETE' && id) {
+    const { error } = await client.from('PrayerRequest').delete().eq('id', id);
+    if (error) throw error;
+    return;
+  }
+
+  if (resource === 'notifications' && method === 'POST') {
+    const personId = await getPersonIdFromUser(client, authUser.id);
+    
+    if (path.endsWith('/read-all')) {
+      // Get all notifications the user can see and haven't read
+      const { data: list } = await client.from('SystemNotification').select('id, readBy');
+      for (const item of list) {
+        if (!item.readBy?.includes(personId)) {
+          const newReadBy = [...(item.readBy || []), personId];
+          await client.from('SystemNotification').update({ readBy: newReadBy }).eq('id', item.id);
+        }
+      }
+      return;
+    }
+    
+    if (id && path.endsWith('/read')) {
+      const { data: notification } = await client.from('SystemNotification').select('readBy').eq('id', id).single();
+      if (notification && !notification.readBy?.includes(personId)) {
+        const newReadBy = [...(notification.readBy || []), personId];
+        await client.from('SystemNotification').update({ readBy: newReadBy }).eq('id', id);
+      }
+      return;
+    }
+  }
 
   const error = new Error('Endpoint não encontrado.');
   error.statusCode = 404;

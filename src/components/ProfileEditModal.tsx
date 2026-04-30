@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Image as ImageIcon, MapPin, Phone, Upload, User, X } from 'lucide-react';
+import { Calendar, Image as ImageIcon, MapPin, Phone, Upload, User, X } from 'lucide-react';
 import { optimizeAvatarImage } from '../lib/avatarImage';
 import { normalizeInternationalPhone, isValidInternationalPhone, PHONE_PLACEHOLDER, PHONE_HELP_TEXT } from '../lib/phone';
 import { cn } from '../lib/utils';
@@ -16,6 +16,7 @@ export default function ProfileEditModal({ isOpen, onClose, person, onSave }: Pr
   const [formData, setFormData] = useState({
     phone: person?.phone || '',
     address: person?.address || '',
+    baptismDate: person?.baptismDate || '',
   });
   const [avatarImage, setAvatarImage] = useState<{ dataUrl: string; previewUrl: string; size: number; type: string } | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -28,6 +29,7 @@ export default function ProfileEditModal({ isOpen, onClose, person, onSave }: Pr
     setFormData({
       phone: person?.phone || '',
       address: person?.address || '',
+      baptismDate: person?.baptismDate || '',
     });
     setAvatarImage(null);
     setImageError(null);
@@ -55,6 +57,7 @@ export default function ProfileEditModal({ isOpen, onClose, person, onSave }: Pr
       await onSave({
         phone: normalizeInternationalPhone(formData.phone),
         address: formData.address.trim(),
+        baptismDate: formData.baptismDate,
         avatarImage: avatarImage?.dataUrl,
       });
       onClose();
@@ -158,6 +161,19 @@ export default function ProfileEditModal({ isOpen, onClose, person, onSave }: Pr
                 ) : (
                   <p className="mt-1.5 text-[10px] text-slate-400 tracking-wider">{PHONE_HELP_TEXT}</p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Data de Batismo</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="date"
+                    value={formData.baptismDate}
+                    onChange={e => setFormData({ ...formData, baptismDate: e.target.value })}
+                    className="w-full pl-10 pr-4 py-2.5 bg-surface-container-highest border border-outline-variant rounded-lg text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-gold/50"
+                  />
+                </div>
               </div>
 
               <div>
