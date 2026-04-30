@@ -100,6 +100,7 @@ type PersonRow = {
   status: Person['status'] | null;
   campusId: string | null;
   cellGroupId: string | null;
+  createdAt: string | null;
 };
 
 type UserRow = UserRecord;
@@ -321,7 +322,7 @@ function mapDomainState(
       campus: row.campusId ? campusMap.get(row.campusId) ?? 'Sem campus' : 'Sem campus',
       role: inferPersonRole(row.id, roleName, cellRows, pairRows, status),
       cellId: row.cellGroupId,
-      since: new Date().getFullYear().toString(),
+      since: (matchingUser?.createdAt || row.createdAt) ? new Date(matchingUser?.createdAt || row.createdAt!).getFullYear().toString() : '—',
       address: row.address ?? '',
       birthdate: row.birthdate ?? '',
       baptismDate: row.baptismDate ?? '',
@@ -533,7 +534,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       );
     } catch (currentError: any) {
       console.error('Erro ao carregar dados da aplicação:', currentError);
-      setState(EMPTY_STATE);
+      // Preserva o estado anterior se já houver dados carregados para evitar "flash" de tela vazia
+      setState((prev) => (prev.persons.length === 0 ? EMPTY_STATE : prev));
       setError(currentError?.message ?? 'Não foi possível carregar os dados da aplicação.');
     } finally {
       setIsLoading(false);

@@ -449,16 +449,20 @@ async function getAuthUser(client, sbUser) {
 }
 
 async function optionalSelect(client, table, columns) {
-  const { data, error } = await client.from(table).select(columns);
+  try {
+    const { data, error } = await client.from(table).select(columns);
 
-  if (error) {
-    if (/schema cache|does not exist|undefined_table/i.test(error.message)) {
+    if (error) {
+      // Log failure but return empty data for optional tables
+      console.error(`[Data] Erro na tabela opcional ${table}:`, error.message);
       return { available: false, data: [] };
     }
-    throw error;
-  }
 
-  return { available: true, data: data ?? [] };
+    return { available: true, data: data ?? [] };
+  } catch (err) {
+    console.error(`[Data] Erro inesperado na tabela opcional ${table}:`, err);
+    return { available: false, data: [] };
+  }
 }
 
 async function getData(client) {
@@ -482,18 +486,22 @@ async function getData(client) {
     settingsResult,
     prayerRequestsResult,
     notificationsResult,
+    discipleshipJournalsResult,
   ] = await Promise.all([
+    // Tabelas Primárias (Obrigatórias)
     client.from('Campus').select('id, name').order('name'),
     client.from('Role').select('id, name, description').order('name'),
     client.from('User').select('id, email, personId, roleId, supabaseId, createdAt'),
-    client.from('Person').select('id, firstName, lastName, email, phone, address, birthdate, baptismDate, notes, avatarUrl, status, campusId, cellGroupId'),
+    client.from('Person').select('id, firstName, lastName, email, phone, address, birthdate, baptismDate, notes, avatarUrl, status, campusId, cellGroupId, createdAt'),
     client.from('CellGroup').select('id, name, leaderId, day, time, location, campusId, health, traineeLeaderIds'),
-    client.from('DiscipleshipPair').select('id, mentorId, discipleId, course, progress, lastMeeting, startDate'),
-    client.from('FollowUp').select('id, personId, responsibleId, type, date, status, priority, notes'),
-    client.from('Family').select('id, name'),
-    client.from('Ministry').select('id, name, description'),
-    client.from('Event').select('id, name, description, date, time, location, category, campusId, status'),
-    client.from('Schedule').select('id, ministryId, date, time, status'),
+
+    // Tabelas Secundárias (Opcionais via optionalSelect)
+    optionalSelect(client, 'DiscipleshipPair', 'id, mentorId, discipleId, course, progress, lastMeeting, startDate'),
+    optionalSelect(client, 'FollowUp', 'id, personId, responsibleId, type, date, status, priority, notes'),
+    optionalSelect(client, 'Family', 'id, name'),
+    optionalSelect(client, 'Ministry', 'id, name, description'),
+    optionalSelect(client, 'Event', 'id, name, description, date, time, location, category, campusId, status'),
+    optionalSelect(client, 'Schedule', 'id, ministryId, date, time, status'),
     optionalSelect(client, 'FamilyMember', 'id, familyId, personId, relationship, isPrimaryContact, status'),
     optionalSelect(client, 'MinistryMember', 'id'),
     optionalSelect(client, 'EventRegistration', 'id'),
@@ -505,18 +513,13 @@ async function getData(client) {
     optionalSelect(client, 'DiscipleshipJournal', 'id, pairId, authorId, content, createdAt'),
   ]);
 
+  // Apenas Campus, Role, User, Person e CellGroup são estritamente obrigatórios para o app iniciar
   const requiredResults = [
     campusResult,
     roleResult,
     userResult,
     personResult,
     cellResult,
-    pairResult,
-    followUpResult,
-    familyResult,
-    ministryResult,
-    eventResult,
-    scheduleResult,
   ];
   const requiredError = requiredResults.find((result) => result.error)?.error;
   if (requiredError) throw requiredError;
