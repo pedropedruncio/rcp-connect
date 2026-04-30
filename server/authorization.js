@@ -121,9 +121,17 @@ export function sanitizePersonPayload(authUser, targetPersonId, payload = {}) {
   };
 }
 
+function isPersonInScope(authUser, personId) {
+  return (
+    personId === authUser.id ||
+    authUser.memberIds?.includes(personId) ||
+    authUser.leaderPersonIds?.includes(personId)
+  );
+}
+
 function hasAllInScope(authUser, personIds) {
   const uniqueIds = Array.from(new Set(personIds.filter(Boolean)));
-  return uniqueIds.length > 0 && uniqueIds.every((personId) => authUser.memberIds?.includes(personId));
+  return uniqueIds.length > 0 && uniqueIds.every((personId) => isPersonInScope(authUser, personId));
 }
 
 async function getExistingDiscipleshipPair(client, id) {
@@ -155,12 +163,21 @@ export async function assertMutationPermission({ client, authUser, method, resou
 
   if (resource === 'people') {
     if (method === 'POST') {
-      if (!isPastorOrAdmin(authUser)) {
-        throw forbidden('Apenas liderança autorizada pode criar pessoas.');
+      assertNoAdminOnlyPersonFields(authUser, body);
+
+      if (isPastorOrAdmin(authUser)) {
+        return;
       }
 
-      assertNoAdminOnlyPersonFields(authUser, body);
-      return;
+      if (
+        hasRole(authUser, ['LEADER', 'DISCIPLER']) &&
+        body.cellGroupId &&
+        authUser.supervisedCellIds?.includes(body.cellGroupId)
+      ) {
+        return;
+      }
+
+      throw forbidden('Apenas liderança autorizada pode criar pessoas no seu âmbito.');
     }
 
     if (method === 'PATCH' && id) {
@@ -209,7 +226,7 @@ export async function assertMutationPermission({ client, authUser, method, resou
       throw httpError(404, 'Endpoint não encontrado.');
     }
 
-    if (!hasRole(authUser, ['ADMIN', 'PASTOR', 'DISCIPLER'])) {
+    if (!hasRole(authUser, ['ADMIN', 'PASTOR', 'LEADER', 'DISCIPLER'])) {
       throw forbidden('Não tem permissão para gerir discipulados.');
     }
 
@@ -299,6 +316,14 @@ export async function assertMutationPermission({ client, authUser, method, resou
     return;
   }
 
+  if (resource === 'notifications') {
+    if (method !== 'POST') {
+      throw httpError(404, 'Endpoint não encontrado.');
+    }
+
+    return;
+  }
+
   if (resource === 'prayer-requests') {
     if (!['POST', 'PATCH', 'DELETE'].includes(method)) {
       throw httpError(404, 'Endpoint não encontrado.');
@@ -327,6 +352,10 @@ export async function assertMutationPermission({ client, authUser, method, resou
 
   if (resource === 'discipleship-journals') {
     if (method !== 'POST') throw httpError(404, 'Endpoint não encontrado.');
+    if (body.authorId && body.authorId !== authUser.id) {
+      throw forbidden('O autor da nota deve ser o utilizador autenticado.');
+    }
+
     if (isPastorOrAdmin(authUser)) return;
 
     const { data: pair, error } = await client

@@ -465,7 +465,37 @@ async function optionalSelect(client, table, columns) {
   }
 }
 
-async function getData(client) {
+function hasLeadershipRole(authUser) {
+  return ['ADMIN', 'PASTOR'].includes(authUser?.role);
+}
+
+function canReadNotification(authUser, notification) {
+  const content = notification?.content ?? {};
+  const targetPersonId = content.targetPersonId;
+  const targetPersonIds = Array.isArray(content.targetPersonIds) ? content.targetPersonIds : [];
+  const targetRoles = Array.isArray(content.targetRoles)
+    ? content.targetRoles
+    : content.targetRole
+      ? [content.targetRole]
+      : [];
+
+  if (hasLeadershipRole(authUser)) return true;
+  if (targetPersonId) return targetPersonId === authUser.id;
+  if (targetPersonIds.length > 0) return targetPersonIds.includes(authUser.id);
+  if (targetRoles.length > 0) return targetRoles.includes(authUser.role);
+
+  return false;
+}
+
+function canReadDiscipleshipJournal(authUser, pair) {
+  if (!pair) return false;
+  if (hasLeadershipRole(authUser)) return true;
+  if (pair.mentorId === authUser.id) return true;
+
+  return authUser?.role === 'DISCIPLER' && authUser.leaderPersonIds?.includes(pair.mentorId);
+}
+
+async function getData(client, authUser) {
   const [
     campusResult,
     roleResult,
@@ -524,6 +554,13 @@ async function getData(client) {
   const requiredError = requiredResults.find((result) => result.error)?.error;
   if (requiredError) throw requiredError;
 
+  const pairRows = pairResult.data ?? [];
+  const pairById = new Map(pairRows.map((pair) => [pair.id, pair]));
+  const notificationRows = (notificationsResult.data ?? []).filter((notification) => canReadNotification(authUser, notification));
+  const discipleshipJournalRows = (discipleshipJournalsResult.data ?? []).filter((journal) =>
+    canReadDiscipleshipJournal(authUser, pairById.get(journal.pairId)),
+  );
+
   return {
     supports: {
       familyMembers: familyMembersResult.available,
@@ -538,7 +575,7 @@ async function getData(client) {
     users: userResult.data ?? [],
     persons: personResult.data ?? [],
     cells: cellResult.data ?? [],
-    discipleshipPairs: pairResult.data ?? [],
+    discipleshipPairs: pairRows,
     followUps: followUpResult.data ?? [],
     families: familyResult.data ?? [],
     familyMembers: familyMembersResult.data,
@@ -548,8 +585,8 @@ async function getData(client) {
     preferences: preferencesResult.data,
     settings: settingsResult.data,
     prayerRequests: prayerRequestsResult.data || [],
-    notifications: notificationsResult.data || [],
-    discipleshipJournals: discipleshipJournalsResult.data || [],
+    notifications: notificationRows,
+    discipleshipJournals: discipleshipJournalRows,
   };
 }
 
@@ -859,6 +896,27 @@ async function updatePerson(client, authUser, id, payload) {
   }
 }
 
+async function insertSystemNotification(client, payload) {
+  try {
+    const notificationClient = createPrivilegedClient() ?? client;
+    const { error } = await notificationClient.from('SystemNotification').insert({
+      id: payload.id ?? `notif_${crypto.randomUUID()}`,
+      readBy: [],
+      ...payload,
+    });
+
+    if (error) {
+      console.warn('[SystemNotification] insert failed:', error.message);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.warn('[SystemNotification] insert error:', err);
+    return false;
+  }
+}
+
 async function notifyLeaderOfPrayerRequest(client, personId, prayerRequestId, requestText) {
   try {
     const { data: person, error: personErr } = await client
@@ -877,11 +935,10 @@ async function notifyLeaderOfPrayerRequest(client, personId, prayerRequestId, re
 
     if (cellErr || !cell?.leaderId) return;
 
-    const privClient = createPrivilegedClient() ?? client;
-    await privClient.from('SystemNotification').insert({
-      id: `notif_${crypto.randomUUID()}`,
+    await insertSystemNotification(client, {
       type: 'PRAYER_REQUEST',
       content: {
+        title: 'Novo pedido de oração',
         message: `Novo pedido de oração de ${person.firstName}: "${requestText.slice(0, 50)}${requestText.length > 50 ? '...' : ''}"`,
         personId,
         prayerRequestId,
@@ -903,6 +960,56 @@ async function getCurrentPersonId(client, sbUser) {
 
   if (error) throw error;
   return data.personId;
+}
+
+function permissionError(message = 'Não tem permissão para aceder a esta notificação.') {
+  const error = new Error(message);
+  error.statusCode = 403;
+  return error;
+}
+
+async function markNotificationRead(client, authUser, notificationId) {
+  const notificationClient = createPrivilegedClient() ?? client;
+  const { data: notification, error } = await notificationClient
+    .from('SystemNotification')
+    .select('id, content, readBy')
+    .eq('id', notificationId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!notification) return;
+  if (!canReadNotification(authUser, notification)) throw permissionError();
+  if (notification.readBy?.includes(authUser.id)) return;
+
+  const readBy = [...(notification.readBy ?? []), authUser.id];
+  const { error: updateError } = await notificationClient
+    .from('SystemNotification')
+    .update({ readBy })
+    .eq('id', notification.id);
+
+  if (updateError) throw updateError;
+}
+
+async function markVisibleNotificationsRead(client, authUser) {
+  const notificationClient = createPrivilegedClient() ?? client;
+  const { data: notifications, error } = await notificationClient
+    .from('SystemNotification')
+    .select('id, content, readBy');
+
+  if (error) throw error;
+
+  for (const notification of notifications ?? []) {
+    if (!canReadNotification(authUser, notification) || notification.readBy?.includes(authUser.id)) {
+      continue;
+    }
+
+    const { error: updateError } = await notificationClient
+      .from('SystemNotification')
+      .update({ readBy: [...(notification.readBy ?? []), authUser.id] })
+      .eq('id', notification.id);
+
+    if (updateError) throw updateError;
+  }
 }
 
 async function handleMutation(client, authUser, method, path, body) {
@@ -927,7 +1034,9 @@ async function handleMutation(client, authUser, method, path, body) {
   }
   if (resource === 'discipleship-pairs' && method === 'POST') return insertRow(client, 'DiscipleshipPair', body);
   if (resource === 'discipleship-pairs' && method === 'PATCH' && id) return updateRow(client, 'DiscipleshipPair', id, body);
-  if (resource === 'discipleship-journals' && method === 'POST') return insertRow(client, 'DiscipleshipJournal', body);
+  if (resource === 'discipleship-journals' && method === 'POST') {
+    return insertRow(client, 'DiscipleshipJournal', { ...body, authorId: authUser.id });
+  }
   if (resource === 'follow-ups' && method === 'POST') return insertRow(client, 'FollowUp', body);
   if (resource === 'follow-ups' && method === 'PATCH' && id) return updateRow(client, 'FollowUp', id, body);
   if (resource === 'families' && method === 'POST') return insertRow(client, 'Family', body);
@@ -949,7 +1058,7 @@ async function handleMutation(client, authUser, method, path, body) {
     if (body.status === 'ANSWERED') {
       const { data: pr } = await client.from('PrayerRequest').select('personId, request').eq('id', id).single();
       if (pr) {
-        await client.from('SystemNotification').insert({
+        await insertSystemNotification(client, {
           type: 'PRAYER_ANSWERED',
           content: {
             title: 'Oração Respondida',
@@ -969,26 +1078,13 @@ async function handleMutation(client, authUser, method, path, body) {
   }
 
   if (resource === 'notifications' && method === 'POST') {
-    const personId = await getPersonIdFromUser(client, authUser.id);
-    
     if (path.endsWith('/read-all')) {
-      // Get all notifications the user can see and haven't read
-      const { data: list } = await client.from('SystemNotification').select('id, readBy');
-      for (const item of list) {
-        if (!item.readBy?.includes(personId)) {
-          const newReadBy = [...(item.readBy || []), personId];
-          await client.from('SystemNotification').update({ readBy: newReadBy }).eq('id', item.id);
-        }
-      }
+      await markVisibleNotificationsRead(client, authUser);
       return;
     }
     
     if (id && path.endsWith('/read')) {
-      const { data: notification } = await client.from('SystemNotification').select('readBy').eq('id', id).single();
-      if (notification && !notification.readBy?.includes(personId)) {
-        const newReadBy = [...(notification.readBy || []), personId];
-        await client.from('SystemNotification').update({ readBy: newReadBy }).eq('id', id);
-      }
+      await markNotificationRead(client, authUser, id);
       return;
     }
   }
@@ -1166,27 +1262,19 @@ export async function handler(event) {
       const campusName = userRow.Person?.Campus?.name ?? 'Sem campus';
       const memberName = `${firstName ?? userRow.Person?.firstName ?? ''} ${lastName ?? userRow.Person?.lastName ?? ''}`.trim();
 
-      try {
-        const { error: notifError } = await auth.client
-          .from('SystemNotification')
-          .insert({
-            id: `notif_${crypto.randomUUID()}`,
-            type: 'NEW_MEMBER_REGISTERED',
-            content: {
-              personId: userRow.personId,
-              name: memberName,
-              email: userRow.email,
-              phone,
-              campus: campusName,
-              registeredAt: new Date().toISOString(),
-            },
-          });
-        if (notifError) {
-          console.warn('[onboarding] SystemNotification insert failed (table may not exist yet):', notifError.message);
-        }
-      } catch (notifErr) {
-        console.warn('[onboarding] SystemNotification insert error:', notifErr);
-      }
+      await insertSystemNotification(auth.client, {
+        type: 'NEW_MEMBER_REGISTERED',
+        content: {
+          title: 'Novo membro registado',
+          message: `${memberName || userRow.email} completou o perfil inicial em ${campusName}.`,
+          personId: userRow.personId,
+          name: memberName,
+          email: userRow.email,
+          phone,
+          campus: campusName,
+          registeredAt: new Date().toISOString(),
+        },
+      });
 
       // Re-fetch updated user
       const authUser = await getAuthUser(auth.client, auth.user);
@@ -1207,7 +1295,8 @@ export async function handler(event) {
     }
 
     if (method === 'GET' && path === '/data') {
-      return json(200, await getData(auth.client), auth.cookies);
+      const authUser = await getAuthUser(auth.client, auth.user);
+      return json(200, await getData(auth.client, authUser), auth.cookies);
     }
 
     if (method === 'GET' && path === '/campuses') {
@@ -1325,19 +1414,14 @@ export async function handler(event) {
 
       if (inviteErr) throw inviteErr;
 
-      try {
-        await familyClient.from('SystemNotification').insert({
-          id: `notif_${crypto.randomUUID()}`,
-          type: 'FAMILY_INVITE',
-          content: {
-            message: 'Recebeu um convite para integrar uma família.',
-            targetPersonId,
-          },
-          readBy: [],
-        });
-      } catch (notifErr) {
-        console.warn('[family-invite] SystemNotification insert error:', notifErr);
-      }
+      await insertSystemNotification(familyClient, {
+        type: 'FAMILY_INVITE',
+        content: {
+          title: 'Convite familiar',
+          message: 'Recebeu um convite para integrar uma família.',
+          targetPersonId,
+        },
+      });
 
       return json(200, { ok: true, familyId: targetFamilyId }, auth.cookies);
     }

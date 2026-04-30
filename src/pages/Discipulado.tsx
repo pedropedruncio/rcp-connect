@@ -133,8 +133,8 @@ export default function Discipulado() {
                       <div className="flex -space-x-3">
                         {[mentor, disciple].map((pData, i) => (
                           <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-gold/10 flex items-center justify-center text-gold text-xs font-bold overflow-hidden">
-                            {pData?.avatar ? (
-                                <img src={pData.avatar} alt="" className="w-full h-full object-cover" />
+                            {pData?.avatarUrl ? (
+                                <img src={pData.avatarUrl} alt="" className="w-full h-full object-cover" />
                             ) : (
                                 pData?.name.split(' ').map(n => n[0]).slice(0,2).join('') ?? '?'
                             )}

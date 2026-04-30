@@ -64,10 +64,11 @@ export default function Celulas() {
   const needsAttention  = scopedCells.filter(c => c.health === 'ATENÇÃO').length;
 
   const isLeaderOnly = user?.role === 'LEADER';
+  const activeCell = selectedCell ? cells.find(c => c.id === selectedCell.id) ?? selectedCell : null;
 
-  if (selectedCell) {
-    const leader = getPersonById(selectedCell.leaderId);
-    const cellPrayerRequests = prayerRequests.filter(pr => selectedCell.memberIds.includes(pr.personId));
+  if (activeCell) {
+    const leader = getPersonById(activeCell.leaderId);
+    const cellPrayerRequests = prayerRequests.filter(pr => activeCell.memberIds.includes(pr.personId));
     const filteredPrs = cellPrayerRequests.filter(pr => prFilter === 'ALL' || pr.status === prFilter);
 
     return (
@@ -81,8 +82,8 @@ export default function Celulas() {
         
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h2 className="text-4xl font-bold text-slate-900 tracking-tight">{selectedCell.name}</h2>
-            <p className="text-slate-500 font-medium">{selectedCell.location} · {selectedCell.day}, {selectedCell.time}</p>
+            <h2 className="text-4xl font-bold text-slate-900 tracking-tight">{activeCell.name}</h2>
+            <p className="text-slate-500 font-medium">{activeCell.location} · {activeCell.day}, {activeCell.time}</p>
           </div>
           <button 
             onClick={() => {
@@ -101,14 +102,14 @@ export default function Celulas() {
              <div className="space-y-3">
                 <div className="p-4 bg-surface-container-high rounded-md flex justify-between items-center border border-outline-variant">
                   <div className="flex items-center gap-3"><Calendar className="w-4 h-4 text-gold"/> <span className="text-sm font-bold text-slate-800">Próximo Encontro</span></div>
-                  <span className="text-xs text-slate-500">{selectedCell.day} às {selectedCell.time}</span>
+                  <span className="text-xs text-slate-500">{activeCell.day} às {activeCell.time}</span>
                 </div>
                 <div className="p-4 bg-surface-container-high rounded-md flex justify-between items-center border border-outline-variant">
                   <div className="flex items-center gap-3"><Users className="w-4 h-4 text-gold"/> <span className="text-sm font-bold text-slate-800">Membros da Célula</span></div>
-                  <span className="text-xs text-slate-500">{selectedCell.memberIds.length} Pessoas</span>
+                  <span className="text-xs text-slate-500">{activeCell.memberIds.length} Pessoas</span>
                 </div>
                 <div className="mt-4 space-y-2">
-                  {persons.filter(p => selectedCell.memberIds.includes(p.id)).map(member => (
+                  {persons.filter(p => activeCell.memberIds.includes(p.id)).map(member => (
                     <div key={member.id} className="flex items-center justify-between p-3 bg-surface rounded-md border border-outline-variant/50">
                       <div className="flex items-center gap-3">
                         <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
@@ -161,7 +162,7 @@ export default function Celulas() {
                           </span>
                         </div>
                         <p className="text-sm text-slate-700">{pr.request}</p>
-                        {pr.status === 'PENDING' && (p.isGlobal || user?.id === selectedCell.leaderId) && (
+                        {pr.status === 'PENDING' && (p.isGlobal || user?.id === activeCell.leaderId) && (
                           <button 
                             onClick={() => updatePrayerRequest(pr.id, { status: 'ANSWERED' })}
                             className="mt-2 text-[9px] font-bold text-gold hover:underline uppercase"
@@ -187,7 +188,7 @@ export default function Celulas() {
              <div>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Líderes em Treino</p>
-                {(p.isGlobal || user?.id === selectedCell.leaderId) && (
+                {(p.isGlobal || user?.id === activeCell.leaderId) && (
                   <button 
                     onClick={() => setTraineeModalOpen(true)}
                     className="text-[10px] font-bold text-gold hover:underline uppercase tracking-widest"
@@ -196,9 +197,9 @@ export default function Celulas() {
                   </button>
                 )}
               </div>
-                {selectedCell.traineeLeaderIds.length > 0 ? (
+                {activeCell.traineeLeaderIds.length > 0 ? (
                   <ul className="text-sm text-slate-600 space-y-2">
-                    {selectedCell.traineeLeaderIds.map(id => {
+                    {activeCell.traineeLeaderIds.map(id => {
                        const p = getPersonById(id);
                        return <li key={id}>• {p?.name ?? 'Desconhecido'}</li>
                     })}
@@ -207,6 +208,24 @@ export default function Celulas() {
              </div>
           </div>
         </div>
+
+        <PrayerRequestModal
+          isOpen={isPrayerModalOpen}
+          onClose={() => setPrayerModalOpen(false)}
+          onSuccess={(msg) => setToast({ show: true, msg })}
+        />
+
+        <TraineeManagementModal
+          isOpen={isTraineeModalOpen}
+          onClose={() => setTraineeModalOpen(false)}
+          cell={activeCell}
+        />
+
+        <Toast
+          isVisible={toast.show}
+          message={toast.msg}
+          onClose={() => setToast({ ...toast, show: false })}
+        />
       </motion.div>
     );
   }

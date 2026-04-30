@@ -933,6 +933,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await refetch();
   }, [refetch]);
 
+  const addDiscipleshipJournal = useCallback(async (pairId: string, content: string) => {
+    if (!user) {
+      throw new Error('Sessão inválida. Entre novamente.');
+    }
+
+    await apiRequest('/discipleship-journals', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: `dj_${crypto.randomUUID()}`,
+        pairId,
+        authorId: user.id,
+        content,
+      }),
+    });
+    await refetch();
+  }, [refetch, user]);
+
   const value = useMemo<DataContextType>(() => ({
     ...state,
     isLoading,
@@ -968,8 +985,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     deletePrayerRequest,
     markNotificationAsRead,
     markAllNotificationsAsRead,
+    addDiscipleshipJournal,
   }), [
     addCell,
+    addDiscipleshipJournal,
     addDiscipleshipPair,
     addEvent,
     addFamily,

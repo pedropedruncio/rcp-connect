@@ -15,9 +15,24 @@ export default function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
-  const myNotifications = notifications.filter(n => 
-    !n.content.targetPersonId || n.content.targetPersonId === user?.id
-  ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const isLeadershipUser = user?.role === 'ADMIN' || user?.role === 'PASTOR';
+  const myNotifications = notifications.filter(n => {
+    const content = n.content ?? {};
+    const targetPersonId = content.targetPersonId;
+    const targetPersonIds = Array.isArray(content.targetPersonIds) ? content.targetPersonIds : [];
+    const targetRoles = Array.isArray(content.targetRoles)
+      ? content.targetRoles
+      : content.targetRole
+        ? [content.targetRole]
+        : [];
+
+    if (isLeadershipUser) return true;
+    if (targetPersonId) return targetPersonId === user?.id;
+    if (targetPersonIds.length > 0) return targetPersonIds.includes(user?.id ?? '');
+    if (targetRoles.length > 0) return targetRoles.includes(user?.role ?? '');
+
+    return false;
+  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const unreadNotifications = myNotifications.filter(n => !n.readBy?.includes(user?.id || ''));
   const unreadCount = unreadNotifications.length;
@@ -136,8 +151,8 @@ export default function Layout() {
                                     !isRead ? "bg-gold" : "bg-transparent"
                                   )} />
                                   <div>
-                                    <p className="text-xs font-bold text-slate-900 mb-0.5">{n.content.title}</p>
-                                    <p className="text-[11px] text-slate-600 leading-normal">{n.content.message}</p>
+                                    <p className="text-xs font-bold text-slate-900 mb-0.5">{n.content?.title ?? 'Notificação'}</p>
+                                    <p className="text-[11px] text-slate-600 leading-normal">{n.content?.message ?? 'Há uma atualização disponível.'}</p>
                                     <p className="text-[9px] text-slate-400 mt-2 font-medium">
                                       {new Date(n.createdAt).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })} • {new Date(n.createdAt).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
                                     </p>

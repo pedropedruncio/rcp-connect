@@ -135,4 +135,63 @@ describe('authorization helpers', () => {
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
   });
+
+  it('LEADER pode criar pessoa apenas numa célula supervisionada', async () => {
+    await expect(
+      assertMutationPermission({
+        client: {},
+        authUser: leader,
+        method: 'POST',
+        resource: 'people',
+        body: { firstName: 'Novo', cellGroupId: 'cell_1' },
+      }),
+    ).resolves.toBeUndefined();
+
+    await expect(
+      assertMutationPermission({
+        client: {},
+        authUser: leader,
+        method: 'POST',
+        resource: 'people',
+        body: { firstName: 'Fora', cellGroupId: 'cell_2' },
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it('LEADER pode criar discipulado quando o mentor é ele próprio e o discípulo está no âmbito', async () => {
+    await expect(
+      assertMutationPermission({
+        client: {},
+        authUser: leader,
+        method: 'POST',
+        resource: 'discipleship-pairs',
+        body: { mentorId: 'per_leader', discipleId: 'per_member' },
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('notificações aceitam POST para marcação de leitura', async () => {
+    await expect(
+      assertMutationPermission({
+        client: {},
+        authUser: member,
+        method: 'POST',
+        resource: 'notifications',
+        id: 'notif_1',
+        body: {},
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('diário de discipulado rejeita autor diferente do utilizador autenticado', async () => {
+    await expect(
+      assertMutationPermission({
+        client: {},
+        authUser: pastor,
+        method: 'POST',
+        resource: 'discipleship-journals',
+        body: { pairId: 'dp_1', authorId: 'per_other', content: 'Nota' },
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
 });

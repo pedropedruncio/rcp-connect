@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { Check, Search, UserPlus, X, Users, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';

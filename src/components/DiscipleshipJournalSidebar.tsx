@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, BookOpen, Clock, FileText, Send, Loader2 } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
+import { useAuth } from '../contexts/AuthContext';
 
 
 interface DiscipleshipJournalSidebarProps {
@@ -11,7 +12,8 @@ interface DiscipleshipJournalSidebarProps {
 }
 
 export default function DiscipleshipJournalSidebar({ isOpen, onClose, pair }: DiscipleshipJournalSidebarProps) {
-  const { getPersonById, discipleshipJournals, addDiscipleshipJournal, user } = useData();
+  const { user } = useAuth();
+  const { getPersonById, discipleshipJournals, addDiscipleshipJournal } = useData();
   const [newNote, setNewNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
