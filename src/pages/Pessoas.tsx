@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Search, Plus, MoreVertical, Mail, Phone, MapPin,
@@ -24,6 +25,134 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const PER_PAGE = 8;
+const ACTION_MENU_WIDTH = 224;
+const ACTION_MENU_ESTIMATED_HEIGHT = 288;
+const ACTION_MENU_GAP = 8;
+const ACTION_MENU_VIEWPORT_MARGIN = 8;
+
+type ActionMenuAnchorRect = Pick<DOMRect, 'top' | 'right' | 'bottom' | 'left' | 'width' | 'height'>;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getActionMenuPosition(
+  anchorRect: ActionMenuAnchorRect,
+  menuWidth = ACTION_MENU_WIDTH,
+  menuHeight = ACTION_MENU_ESTIMATED_HEIGHT,
+) {
+  if (typeof window === 'undefined') {
+    return {
+      top: anchorRect.bottom + ACTION_MENU_GAP,
+      left: anchorRect.left,
+      maxHeight: ACTION_MENU_ESTIMATED_HEIGHT,
+      transformOrigin: 'top right',
+    };
+  }
+
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const spaceBelow = viewportHeight - anchorRect.bottom - ACTION_MENU_GAP - ACTION_MENU_VIEWPORT_MARGIN;
+  const spaceAbove = anchorRect.top - ACTION_MENU_GAP - ACTION_MENU_VIEWPORT_MARGIN;
+  const opensUp = spaceBelow < menuHeight && spaceAbove > spaceBelow;
+  const availableHeight = Math.max(
+    96,
+    Math.min(opensUp ? spaceAbove : spaceBelow, viewportHeight - ACTION_MENU_VIEWPORT_MARGIN * 2),
+  );
+  const renderedHeight = Math.min(menuHeight, availableHeight);
+
+  const preferredLeft =
+    anchorRect.left + menuWidth > viewportWidth - ACTION_MENU_VIEWPORT_MARGIN
+      ? anchorRect.right - menuWidth
+      : anchorRect.left;
+  const maxLeft = Math.max(ACTION_MENU_VIEWPORT_MARGIN, viewportWidth - menuWidth - ACTION_MENU_VIEWPORT_MARGIN);
+  const left = clamp(preferredLeft, ACTION_MENU_VIEWPORT_MARGIN, maxLeft);
+
+  const preferredTop = opensUp
+    ? anchorRect.top - ACTION_MENU_GAP - renderedHeight
+    : anchorRect.bottom + ACTION_MENU_GAP;
+  const maxTop = Math.max(ACTION_MENU_VIEWPORT_MARGIN, viewportHeight - renderedHeight - ACTION_MENU_VIEWPORT_MARGIN);
+  const top = clamp(preferredTop, ACTION_MENU_VIEWPORT_MARGIN, maxTop);
+
+  return {
+    top,
+    left,
+    maxHeight: availableHeight,
+    transformOrigin: opensUp ? 'bottom right' : 'top right',
+  };
+}
+
+function ActionDropdownPortal({
+  anchorRect,
+  menuId,
+  onClose,
+  children,
+}: {
+  anchorRect: ActionMenuAnchorRect;
+  menuId: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState(() => getActionMenuPosition(anchorRect));
+
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    setPosition(getActionMenuPosition(
+      anchorRect,
+      menu?.offsetWidth ?? ACTION_MENU_WIDTH,
+      menu?.offsetHeight ?? ACTION_MENU_ESTIMATED_HEIGHT,
+    ));
+  }, [anchorRect]);
+
+  useEffect(() => {
+    const handleWindowClick = () => onClose();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    const handleScroll = (event: Event) => {
+      if (menuRef.current?.contains(event.target as Node)) return;
+      onClose();
+    };
+
+    window.addEventListener('click', handleWindowClick);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', onClose);
+    window.addEventListener('scroll', handleScroll, true);
+
+    return () => {
+      window.removeEventListener('click', handleWindowClick);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', onClose);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [onClose]);
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <motion.div
+      ref={menuRef}
+      id={menuId}
+      role="menu"
+      initial={{ opacity: 0, scale: 0.96, y: position.transformOrigin.startsWith('bottom') ? 6 : -6 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.96, y: position.transformOrigin.startsWith('bottom') ? 6 : -6 }}
+      transition={{ duration: 0.12 }}
+      style={{
+        top: position.top,
+        left: position.left,
+        maxHeight: position.maxHeight,
+        transformOrigin: position.transformOrigin,
+      }}
+      className="fixed w-56 bg-white border border-outline-variant rounded-lg shadow-xl z-[1000] py-1 overflow-y-auto"
+      onClick={(event) => event.stopPropagation()}
+    >
+      {children}
+    </motion.div>,
+    document.body,
+  );
+}
 
 export default function Pessoas() {
   const { user } = useAuth();
@@ -39,6 +168,7 @@ export default function Pessoas() {
   const [discipleshipTarget, setDiscipleshipTarget] = useState<Person | null>(null);
   const [toast, setToast] = useState<{show: boolean, msg: string}>({ show: false, msg: '' });
   const [openActionsId, setOpenActionsId] = useState<string | null>(null);
+  const [actionsAnchorRect, setActionsAnchorRect] = useState<ActionMenuAnchorRect | null>(null);
 
   // ── Scope: quais pessoas este utilizador pode ver ─────────────────────────
   const scopedPeople = useMemo(() => {
@@ -111,12 +241,10 @@ export default function Pessoas() {
     return '';
   }, [p.isGlobal, user, scopedPeople, persons.length]);
 
-  // Fechar menu ao clicar fora
-  useEffect(() => {
-    const handleClick = () => setOpenActionsId(null);
-    window.addEventListener('click', handleClick);
-    return () => window.removeEventListener('click', handleClick);
-  }, []);
+  const closeActionsMenu = () => {
+    setOpenActionsId(null);
+    setActionsAnchorRect(null);
+  };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-8">
@@ -275,24 +403,44 @@ export default function Pessoas() {
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
-                        setOpenActionsId(openActionsId === person.id ? null : person.id);
+                        if (openActionsId === person.id) {
+                          closeActionsMenu();
+                          return;
+                        }
+
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setActionsAnchorRect({
+                          top: rect.top,
+                          right: rect.right,
+                          bottom: rect.bottom,
+                          left: rect.left,
+                          width: rect.width,
+                          height: rect.height,
+                        });
+                        setOpenActionsId(person.id);
                       }}
+                      aria-haspopup="menu"
+                      aria-expanded={openActionsId === person.id}
+                      aria-controls={openActionsId === person.id ? `person-actions-${person.id}` : undefined}
+                      aria-label={`Abrir ações de ${person.name}`}
                       className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-surface-container-high rounded-md transition-all"
                     >
                       <MoreVertical className="w-4 h-4" />
                     </button>
 
                     <AnimatePresence>
-                      {openActionsId === person.id && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                          className="absolute right-8 top-12 w-48 bg-white border border-outline-variant rounded-lg shadow-xl z-50 py-1 overflow-hidden"
-                          onClick={(e) => e.stopPropagation()}
+                      {openActionsId === person.id && actionsAnchorRect && (
+                        <ActionDropdownPortal
+                          anchorRect={actionsAnchorRect}
+                          menuId={`person-actions-${person.id}`}
+                          onClose={closeActionsMenu}
                         >
                           <button
-                            onClick={() => navigate(`/pessoas/${person.id}`)}
+                            role="menuitem"
+                            onClick={() => {
+                              closeActionsMenu();
+                              navigate(`/pessoas/${person.id}`);
+                            }}
                             className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                           >
                             <User className="w-4 h-4 text-slate-400" /> Ver perfil
@@ -300,10 +448,11 @@ export default function Pessoas() {
                           
                           {p.canEditMember && (
                             <button
+                              role="menuitem"
                               onClick={() => {
                                 setEditingPerson(person);
                                 setIsModalOpen(true);
-                                setOpenActionsId(null);
+                                closeActionsMenu();
                               }}
                               className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                             >
@@ -313,7 +462,9 @@ export default function Pessoas() {
 
                           {person.email && (
                             <a
+                              role="menuitem"
                               href={`mailto:${person.email}`}
+                              onClick={closeActionsMenu}
                               className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                             >
                               <Mail className="w-4 h-4 text-slate-400" /> Enviar email
@@ -322,9 +473,11 @@ export default function Pessoas() {
 
                           {person.address && (
                             <a
+                              role="menuitem"
                               href={buildGoogleMapsSearchUrl(person.address)}
                               target="_blank"
                               rel="noopener noreferrer"
+                              onClick={closeActionsMenu}
                               className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                             >
                               <ExternalLink className="w-4 h-4 text-slate-400" /> Ver no Maps
@@ -333,10 +486,11 @@ export default function Pessoas() {
 
                           {p.canAddFollowUp && (
                             <button
+                              role="menuitem"
                               onClick={() => {
                                 setFollowUpTarget(person);
                                 setIsFollowUpModalOpen(true);
-                                setOpenActionsId(null);
+                                closeActionsMenu();
                               }}
                               className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors border-t border-slate-100"
                             >
@@ -346,17 +500,18 @@ export default function Pessoas() {
 
                           {p.canAddDiscipleship && (
                             <button
+                              role="menuitem"
                               onClick={() => {
                                 setDiscipleshipTarget(person);
                                 setIsDiscipleshipModalOpen(true);
-                                setOpenActionsId(null);
+                                closeActionsMenu();
                               }}
                               className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors border-t border-slate-100"
                             >
                               <BookOpen className="w-4 h-4 text-blue-500" /> Iniciar discipulado
                             </button>
                           )}
-                        </motion.div>
+                        </ActionDropdownPortal>
                       )}
                     </AnimatePresence>
                   </td>
