@@ -1,6 +1,6 @@
 import type { Role } from '../contexts/AuthContext';
 
-export type PersonStatus = 'MEMBRO' | 'VISITANTE' | 'BATIZADO' | 'INATIVO';
+export type PersonStatus = 'MEMBRO' | 'VISITANTE' | 'INATIVO';
 
 export type PersonRole =
   | 'Membro'

@@ -176,6 +176,7 @@ export default function Layout() {
               </div>
             </div>
           </div>
+        </div>
         </header>
         <div className="flex-1 pt-16">
           <Outlet />

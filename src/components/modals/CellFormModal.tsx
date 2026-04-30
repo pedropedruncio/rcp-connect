@@ -27,6 +27,7 @@ export default function CellFormModal({ isOpen, onClose, onSuccess, initialData 
     time: '20:00',
     health: 'ESTÁVEL',
     campusId: null,
+    traineeLeaderIds: [],
   });
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function CellFormModal({ isOpen, onClose, onSuccess, initialData 
       time: initialData?.time ?? '20:00',
       health: initialData?.health ?? 'ESTÁVEL',
       campusId: initialData?.campusId ?? campuses[0]?.id ?? null,
+      traineeLeaderIds: initialData?.traineeLeaderIds ?? [],
     });
   }, [campuses, initialData, isOpen]);
 
@@ -192,6 +194,33 @@ export default function CellFormModal({ isOpen, onClose, onSuccess, initialData 
                   onChange={(event) => setFormData((current) => ({ ...current, location: event.target.value }))}
                   className="input-heritage"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Líderes em Treino</label>
+                <div className="flex flex-wrap gap-2 p-3 bg-surface-container-high border border-outline-variant rounded-md min-h-[44px]">
+                  {persons.filter(p => p.role === 'Líder em Formação').map(person => (
+                    <label key={person.id} className="flex items-center gap-2 px-2 py-1 bg-white border border-outline-variant rounded text-xs cursor-pointer hover:border-gold transition-colors">
+                      <input 
+                        type="checkbox"
+                        className="w-3 h-3 accent-gold"
+                        checked={formData.traineeLeaderIds?.includes(person.id)}
+                        onChange={(e) => {
+                          const ids = formData.traineeLeaderIds || [];
+                          if (e.target.checked) {
+                            setFormData(prev => ({ ...prev, traineeLeaderIds: [...ids, person.id] }));
+                          } else {
+                            setFormData(prev => ({ ...prev, traineeLeaderIds: ids.filter(id => id !== person.id) }));
+                          }
+                        }}
+                      />
+                      {person.name}
+                    </label>
+                  ))}
+                  {persons.filter(p => p.role === 'Líder em Formação').length === 0 && (
+                    <p className="text-[10px] text-slate-400 italic">Nenhum líder em formação disponível.</p>
+                  )}
+                </div>
               </div>
             </form>
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, Mail, MapPin, Phone } from 'lucide-react';
+import { ArrowLeft, Calendar, Mail, MapPin, Phone, Droplets } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 import { getInitials } from '../lib/domain';
 
@@ -43,9 +43,14 @@ export default function PerfilPessoa() {
             </div>
             <h3 className="text-2xl font-bold text-slate-900">{person.name}</h3>
             <p className="mt-1 text-sm text-slate-500">{person.role}</p>
-            <div className="mt-4 flex justify-center gap-2">
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
               <span className="badge-heritage bg-green-100 text-green-700">{person.status}</span>
               <span className="badge-heritage bg-slate-100 text-slate-700">{person.campus}</span>
+              {person.baptismDate && (
+                <span className="badge-heritage bg-blue-50 text-blue-600 border border-blue-100 flex items-center gap-1">
+                  <Droplets className="w-3 h-3" /> Batizado
+                </span>
+              )}
             </div>
           </div>
 
@@ -62,6 +67,10 @@ export default function PerfilPessoa() {
             <div className="flex items-center gap-3 text-sm text-slate-600">
               <MapPin className="h-4 w-4 text-slate-400" />
               <span>{cell?.location ?? person.campus}</span>
+            </div>
+            <div className="flex items-center gap-3 text-sm text-slate-600">
+              <Calendar className="h-4 w-4 text-slate-400" />
+              <span>Batismo: {person.baptismDate || 'Não registado'}</span>
             </div>
           </div>
         </div>

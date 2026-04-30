@@ -37,7 +37,7 @@ export default function Celulas() {
   // ── Scope ────────────────────────────────────────────────────────────────
   const scopedCells = useMemo((): CellGroup[] => {
     if (!user) return [];
-    if (p.isGlobalScope) return cells;
+    if (p.isGlobal) return cells;
 
     const supervisedCellIds = user.supervisedCellIds || [];
 
@@ -48,7 +48,7 @@ export default function Celulas() {
       return cells.filter(c => c.leaderId === user.id);
     }
     return [];
-  }, [user, p.isGlobalScope, cells]);
+  }, [user, p.isGlobal, cells]);
 
   const [search, setSearch] = useState('');
   const filtered = useMemo(() =>
@@ -161,7 +161,7 @@ export default function Celulas() {
                           </span>
                         </div>
                         <p className="text-sm text-slate-700">{pr.request}</p>
-                        {pr.status === 'PENDING' && (p.isGlobalScope || user?.id === selectedCell.leaderId) && (
+                        {pr.status === 'PENDING' && (p.isGlobal || user?.id === selectedCell.leaderId) && (
                           <button 
                             onClick={() => updatePrayerRequest(pr.id, { status: 'ANSWERED' })}
                             className="mt-2 text-[9px] font-bold text-gold hover:underline uppercase"
@@ -187,7 +187,7 @@ export default function Celulas() {
              <div>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Líderes em Treino</p>
-                {(p.isGlobalScope || user?.id === selectedCell.leaderId) && (
+                {(p.isGlobal || user?.id === selectedCell.leaderId) && (
                   <button 
                     onClick={() => setTraineeModalOpen(true)}
                     className="text-[10px] font-bold text-gold hover:underline uppercase tracking-widest"
@@ -232,7 +232,7 @@ export default function Celulas() {
           <p className="text-slate-500 font-medium">
             {isLeaderOnly
               ? 'Informações e membros do seu grupo.'
-              : p.isGlobalScope
+              : p.isGlobal
                 ? 'Visão global de todos os pequenos grupos.'
                 : `Células sob a sua supervisão (${scopedCells.length})`
             }

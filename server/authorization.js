@@ -187,6 +187,14 @@ export async function assertMutationPermission({ client, authUser, method, resou
         Array.isArray(authUser.supervisedCellIds) &&
         authUser.supervisedCellIds.includes(id)
       ) {
+        // LEADER can only edit basic fields
+        const allowedFields = new Set(['day', 'time', 'location', 'name', 'traineeLeaderIds']);
+        const payloadKeys = Object.keys(body);
+        const forbiddenFields = payloadKeys.filter(key => !allowedFields.has(key));
+
+        if (forbiddenFields.length > 0) {
+          throw forbidden(`Não tem permissão para alterar estes campos: ${forbiddenFields.join(', ')}`);
+        }
         return;
       }
 
@@ -313,6 +321,23 @@ export async function assertMutationPermission({ client, authUser, method, resou
       if (request.personId === authUser.id) return;
       if (canManagePerson(authUser, request.personId)) return;
       throw forbidden('Não tem permissão para gerir este pedido de oração.');
+    }
+    return;
+  }
+
+  if (resource === 'discipleship-journals') {
+    if (method !== 'POST') throw httpError(404, 'Endpoint não encontrado.');
+    if (isPastorOrAdmin(authUser)) return;
+
+    const { data: pair, error } = await client
+      .from('DiscipleshipPair')
+      .select('mentorId')
+      .eq('id', body.pairId)
+      .single();
+    
+    if (error || !pair) throw forbidden('Par de discipulado não encontrado.');
+    if (pair.mentorId !== authUser.id) {
+      throw forbidden('Apenas o mentor do par pode adicionar notas ao diário.');
     }
     return;
   }

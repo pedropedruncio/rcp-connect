@@ -40,7 +40,7 @@ export default function Acompanhamento() {
   // ── Scope ────────────────────────────────────────────────────────────────
   const scopedFollowUps = useMemo(() => {
     if (!user) return [];
-    if (p.isGlobalScope) return followUps;
+    if (p.isGlobal) return followUps;
 
     const supervisedCellIds = user.supervisedCellIds || [];
     
@@ -58,7 +58,7 @@ export default function Acompanhamento() {
     }
 
     return [];
-  }, [user, p.isGlobalScope, followUps, cells]);
+  }, [user, p.isGlobal, followUps, cells]);
 
   // Filtros
   const [search, setSearch]     = useState('');
@@ -130,7 +130,7 @@ export default function Acompanhamento() {
         <div>
           <h2 className="text-4xl font-bold text-slate-900 tracking-tight">Acompanhamento Pastoral</h2>
           <p className="text-slate-500 font-medium">
-            {p.isGlobalScope
+            {p.isGlobal
               ? 'Gestão global de visitas, chamadas e aconselhamentos.'
               : user?.role === 'DISCIPLER'
                 ? 'Acompanhamentos a decorrer nas células que supervisiona.'

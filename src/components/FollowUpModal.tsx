@@ -24,7 +24,7 @@ export default function FollowUpModal({ isOpen, onClose, onSubmit, initialData }
   // ── Scoped Persons for Selection ─────────────────────────────────────────
   const selectablePersons = React.useMemo(() => {
     if (!user) return [];
-    if (p.isGlobalScope) return persons;
+    if (p.isGlobal) return persons;
 
     const supervisedCellIds = user.supervisedCellIds || [];
     const leaderCellIds = cells
@@ -41,7 +41,7 @@ export default function FollowUpModal({ isOpen, onClose, onSubmit, initialData }
     }
     
     return persons.filter(per => per.id === user.id);
-  }, [user, p.isGlobalScope, persons, cells]);
+  }, [user, p.isGlobal, persons, cells]);
 
   const [formData, setFormData] = useState<FollowUpInput>({
     personId: '',

@@ -30,7 +30,7 @@ export default function Discipulado() {
   // ── Scope ────────────────────────────────────────────────────────────────
   const scopedPairs = useMemo(() => {
     if (!user) return [];
-    if (p.isGlobalScope) return discipleshipPairs;
+    if (p.isGlobal) return discipleshipPairs;
 
     const supervisedCellIds = user.supervisedCellIds || [];
 
@@ -46,14 +46,14 @@ export default function Discipulado() {
     }
 
     return [];
-  }, [cells, discipleshipPairs, p.isGlobalScope, user]);
+  }, [cells, discipleshipPairs, p.isGlobal, user]);
 
   const completedCount = scopedPairs.filter(dp => dp.progress >= 100).length;
   const avgProgress    = scopedPairs.length
     ? Math.round(scopedPairs.reduce((s, dp) => s + dp.progress, 0) / scopedPairs.length)
     : 0;
 
-  const ambitoSubtitle = p.isGlobalScope
+  const ambitoSubtitle = p.isGlobal
     ? 'Visão global de todos os pares de discipulado da rede.'
     : user?.role === 'DISCIPLER'
       ? 'Pares de discipulado nas células que supervisiona.'
@@ -110,7 +110,7 @@ export default function Discipulado() {
           <h3 className="text-xl font-bold text-slate-900">
             {user?.role === 'LEADER' ? 'Os Meus Discípulos' : 'Pares de Discipulado'}
           </h3>
-          {p.isGlobalScope && (
+          {p.isGlobal && (
             <button className="text-xs font-bold text-gold hover:underline uppercase tracking-widest">Ver Todos</button>
           )}
         </div>

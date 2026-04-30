@@ -20,7 +20,7 @@ export default function Lideranca() {
   const [toast, setToast] = React.useState<{ show: boolean; msg: string }>({ show: false, msg: '' });
 
   const leaders = persons.filter((person) => LEADERSHIP_ROLES.has(person.role));
-  const scopedLeaders = permissions.isGlobalScope
+  const scopedLeaders = permissions.isGlobal
     ? leaders
     : leaders.filter((person) => {
         const ledCell = getCellByLeaderId(person.id);
@@ -47,7 +47,7 @@ export default function Lideranca() {
         <div>
           <h2 className="text-4xl font-bold tracking-tight text-slate-900">Liderança</h2>
           <p className="font-medium text-slate-500">
-            {permissions.isGlobalScope
+            {permissions.isGlobal
               ? 'Visão global de líderes, discipuladores e cobertura atual.'
               : `Liderança visível no seu âmbito atual (${scopedLeaders.length})`}
           </p>
@@ -69,7 +69,7 @@ export default function Lideranca() {
         {[
           { label: 'Liderança ativa', value: scopedLeaders.length, icon: ShieldCheck },
           { label: 'Líderes com célula', value: scopedLeaders.filter((person) => cells.some((cell) => cell.leaderId === person.id)).length, icon: Star },
-          { label: 'Células cobertas', value: permissions.isGlobalScope ? cells.length : user?.supervisedCellIds.length ?? 0, icon: Users },
+          { label: 'Células cobertas', value: permissions.isGlobal ? cells.length : user?.supervisedCellIds.length ?? 0, icon: Users },
         ].map((item) => (
           <div key={item.label} className="card-heritage p-5">
             <div className="mb-3 rounded-md bg-surface p-2 w-fit">

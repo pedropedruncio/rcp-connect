@@ -105,11 +105,11 @@ export function usePermissions() {
     canManageSystem:             has(CAN_MANAGE_SYSTEM),
     canManageCredentials:        has(CAN_MANAGE_CREDENTIALS),
 
-    // ── Scope ─────────────────────────────────────────────────────────────────
+    // ── Âmbitos ───────────────────────────────────────────────────────────────
     /** Verdadeiro se o utilizador tem acesso irrestrito (pastor/admin) */
-    isGlobalScope:         has(['PASTOR', 'ADMIN']),
-    /** Verdadeiro se o utilizador tem scope alargado (discipulador+) */
-    isWideScope:           has(['DISCIPLER', 'PASTOR', 'ADMIN']),
+    isGlobal:         has(['PASTOR', 'ADMIN']),
+    /** Verdadeiro se o utilizador tem âmbito alargado (discipulador+) */
+    isWide:           has(['DISCIPLER', 'PASTOR', 'ADMIN']),
     /** Verdadeiro se o utilizador é líder ou superior */
     isLeaderOrAbove:       has(['LEADER', 'DISCIPLER', 'PASTOR', 'ADMIN']),
   };

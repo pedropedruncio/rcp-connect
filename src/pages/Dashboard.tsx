@@ -44,7 +44,7 @@ export default function Dashboard() {
   const dashboardCell = user?.role === 'LEADER' ? (ledCell ?? myCell) : myCell;
 
   const scopedCells =
-    permissions.isGlobalScope
+    permissions.isGlobal
       ? cells
       : user?.role === 'LEADER'
         ? cells.filter((cell) => cell.leaderId === user.id)
@@ -64,7 +64,7 @@ export default function Dashboard() {
 
   const scopedPeople = React.useMemo(() => {
     if (!user) return [];
-    if (permissions.isGlobalScope) return persons;
+    if (permissions.isGlobal) return persons;
     if (user.role === 'MEMBER') return persons.filter((p) => p.id === user.id);
 
     const memberIds = new Set(
@@ -73,10 +73,10 @@ export default function Dashboard() {
         .flatMap(c => c.memberIds)
     );
     return persons.filter(per => memberIds.has(per.id));
-  }, [user, permissions.isGlobalScope, persons, cells, leaderCellIds]);
+  }, [user, permissions.isGlobal, persons, cells, leaderCellIds]);
 
   const scopedPairs =
-    permissions.isGlobalScope
+    permissions.isGlobal
       ? discipleshipPairs
       : user?.role === 'LEADER'
         ? discipleshipPairs.filter((pair) => pair.mentorId === user.id || pair.discipleId === user.id)
@@ -86,7 +86,7 @@ export default function Dashboard() {
 
   const scopedFollowUps = React.useMemo(() => {
     if (!user) return [];
-    if (permissions.isGlobalScope) return followUps;
+    if (permissions.isGlobal) return followUps;
 
     // People in scope for follow-up (same as scopedPeople but as IDs)
     const scopedPersonIds = new Set(scopedPeople.map(p => p.id));
@@ -96,7 +96,7 @@ export default function Dashboard() {
       item.responsibleId === user.id || 
       scopedPersonIds.has(item.personId)
     );
-  }, [user, permissions.isGlobalScope, followUps, scopedPeople]);
+  }, [user, permissions.isGlobal, followUps, scopedPeople]);
 
   const upcomingEvents = [...events]
     .filter((event) => new Date(event.date).getTime() >= Date.now() - 86400000)
@@ -106,7 +106,7 @@ export default function Dashboard() {
   const myFamilies = familyMembers?.filter(m => m.personId === user?.id && m.status === 'ACCEPTED').map(m => m.familyId) ?? [];
   const myFamilySize = familyMembers?.filter(m => myFamilies.includes(m.familyId) && m.status === 'ACCEPTED').length ?? 0;
 
-  const cards = permissions.isGlobalScope
+  const cards = permissions.isGlobal
     ? [
         { label: 'Pessoas ativas', value: persons.filter((person) => person.status === 'MEMBRO').length, icon: Users },
         { label: 'Células registadas', value: cells.length, icon: Network },
@@ -146,10 +146,10 @@ export default function Dashboard() {
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h2 className="text-2xl md:text-4xl font-bold tracking-tight text-slate-900">
-            {permissions.isGlobalScope ? 'Painel ministerial' : `Bem-vindo, ${user?.name}`}
+            {permissions.isGlobal ? 'Painel ministerial' : `Bem-vindo, ${user?.name}`}
           </h2>
           <p className="font-medium text-slate-500">
-            {permissions.isGlobalScope
+            {permissions.isGlobal
               ? 'Visão derivada dos dados reais de pessoas, células, eventos e acompanhamento.'
               : 'Resumo do seu âmbito atual dentro do RCP Connect.'}
           </p>

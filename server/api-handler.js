@@ -502,6 +502,7 @@ async function getData(client) {
     optionalSelect(client, 'AppSetting', 'id, settingKey, settingValue, scope'),
     optionalSelect(client, 'PrayerRequest', 'id, personId, request, status, createdAt'),
     optionalSelect(client, 'SystemNotification', 'id, type, content, readBy, createdAt'),
+    optionalSelect(client, 'DiscipleshipJournal', 'id, pairId, authorId, content, createdAt'),
   ]);
 
   const requiredResults = [
@@ -543,8 +544,9 @@ async function getData(client) {
     schedules: scheduleResult.data ?? [],
     preferences: preferencesResult.data,
     settings: settingsResult.data,
-    prayerRequests: prayerRequestsResult.data,
-    notifications: notificationsResult.data,
+    prayerRequests: prayerRequestsResult.data || [],
+    notifications: notificationsResult.data || [],
+    discipleshipJournals: discipleshipJournalsResult.data || [],
   };
 }
 
@@ -922,6 +924,7 @@ async function handleMutation(client, authUser, method, path, body) {
   }
   if (resource === 'discipleship-pairs' && method === 'POST') return insertRow(client, 'DiscipleshipPair', body);
   if (resource === 'discipleship-pairs' && method === 'PATCH' && id) return updateRow(client, 'DiscipleshipPair', id, body);
+  if (resource === 'discipleship-journals' && method === 'POST') return insertRow(client, 'DiscipleshipJournal', body);
   if (resource === 'follow-ups' && method === 'POST') return insertRow(client, 'FollowUp', body);
   if (resource === 'follow-ups' && method === 'PATCH' && id) return updateRow(client, 'FollowUp', id, body);
   if (resource === 'families' && method === 'POST') return insertRow(client, 'Family', body);

@@ -223,7 +223,6 @@ export default function PersonFormModal({ isOpen, onClose, onSuccess, initialDat
                     className="input-heritage"
                   >
                     <option value="VISITANTE">Visitante</option>
-                    <option value="BATIZADO">Batizado</option>
                     <option value="MEMBRO">Membro</option>
                     <option value="INATIVO">Inativo</option>
                   </select>

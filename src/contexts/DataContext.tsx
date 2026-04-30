@@ -37,6 +37,7 @@ import type {
   Schedule,
   ScheduleInput,
   UserRecord,
+  SystemNotification,
 } from '../types/domain';
 
 interface SchemaCapabilities {
@@ -82,6 +83,7 @@ interface DataContextType extends DomainState {
   deletePrayerRequest: (id: string) => Promise<void>;
   markNotificationAsRead: (id: string) => Promise<void>;
   markAllNotificationsAsRead: () => Promise<void>;
+  addDiscipleshipJournal: (pairId: string, content: string) => Promise<void>;
 }
 
 type PersonRow = {
@@ -200,6 +202,14 @@ type SystemNotificationRow = {
   createdAt: string;
 };
 
+type DiscipleshipJournalRow = {
+  id: string;
+  pairId: string;
+  authorId: string;
+  content: string;
+  createdAt: string;
+};
+
 const EMPTY_STATE: DomainState = {
   campuses: [],
   roles: [],
@@ -217,6 +227,7 @@ const EMPTY_STATE: DomainState = {
   settings: [],
   prayerRequests: [],
   notifications: [],
+  discipleshipJournals: [],
 };
 
 const DEFAULT_SUPPORTS: SchemaCapabilities = {
@@ -248,6 +259,7 @@ interface DataApiResponse {
   settings: AppSetting[];
   prayerRequests: PrayerRequestRow[];
   notifications: SystemNotificationRow[];
+  discipleshipJournals: DiscipleshipJournalRow[];
 }
 
 function splitName(name: string) {
@@ -283,6 +295,7 @@ function mapDomainState(
   settings: AppSetting[],
   prayerRequestRows: PrayerRequestRow[],
   notificationRows: SystemNotificationRow[],
+  discipleshipJournalRows: DiscipleshipJournalRow[],
 ): DomainState {
   const campusMap = new Map(campuses.map((campus) => [campus.id, campus.name]));
   const roleMap = new Map(roles.map((role) => [role.id, role.name]));
@@ -469,6 +482,7 @@ function mapDomainState(
     settings,
     prayerRequests,
     notifications,
+    discipleshipJournals: discipleshipJournalRows,
   };
 }
 
@@ -514,6 +528,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           data.settings,
           data.prayerRequests || [],
           data.notifications || [],
+          data.discipleshipJournals || [],
         ),
       );
     } catch (currentError: any) {

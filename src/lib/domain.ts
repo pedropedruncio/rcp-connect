@@ -20,7 +20,7 @@ import type {
   UserRecord,
 } from '../types/domain';
 
-export const PERSON_STATUS_OPTIONS: PersonStatus[] = ['VISITANTE', 'BATIZADO', 'MEMBRO', 'INATIVO'];
+export const PERSON_STATUS_OPTIONS: PersonStatus[] = ['VISITANTE', 'MEMBRO', 'INATIVO'];
 
 export const PERSON_ROLE_LABELS: Record<Role, PersonRole> = {
   MEMBER: 'Membro',
@@ -100,4 +100,5 @@ export interface DomainState {
   settings: AppSetting[];
   prayerRequests: PrayerRequest[];
   notifications: SystemNotification[];
+  discipleshipJournals: any[];
 }

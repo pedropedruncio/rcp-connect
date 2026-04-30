@@ -17,6 +17,7 @@ import ProfileEditModal from '../components/ProfileEditModal';
 import PrayerRequestModal from '../components/PrayerRequestModal';
 import Toast from '../components/ui/Toast';
 import { buildGoogleMapsSearchUrl } from '../lib/address';
+import { cn } from '../lib/utils';
 
 export default function MeuPerfil() {
   const { user } = useAuth();
@@ -30,6 +31,7 @@ export default function MeuPerfil() {
     persons,
     updatePerson,
     prayerRequests,
+    addPrayerRequest,
   } = useData();
   const [isEditModalOpen, setEditModalOpen] = React.useState(false);
   const [isPrayerModalOpen, setPrayerModalOpen] = React.useState(false);
@@ -100,7 +102,14 @@ export default function MeuPerfil() {
       <PrayerRequestModal
         isOpen={isPrayerModalOpen}
         onClose={() => setPrayerModalOpen(false)}
-        onSuccess={(msg) => setToast({ show: true, msg, type: 'success' })}
+        onSubmit={async (data) => {
+          try {
+            await addPrayerRequest({ personId: user.id, request: data.request, isPrivate: data.isPrivate });
+            setToast({ show: true, msg: 'Pedido de oração enviado com sucesso.', type: 'success' });
+          } catch (error: any) {
+            setToast({ show: true, msg: error.message || 'Erro ao enviar pedido.', type: 'error' });
+          }
+        }}
       />
 
       <Toast
