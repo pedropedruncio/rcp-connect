@@ -217,6 +217,18 @@ type DiscipleshipJournalRow = {
   createdAt: string;
 };
 
+type FamilyRemovalRequestRow = {
+  id: string;
+  familyId: string;
+  personId: string;
+  requestedByPersonId: string;
+  reason: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
+  resolvedAt?: string;
+  resolvedByPersonId?: string;
+};
+
 const EMPTY_STATE: DomainState = {
   campuses: [],
   roles: [],

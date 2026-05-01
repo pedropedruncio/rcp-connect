@@ -150,6 +150,14 @@ export interface FamilyRemovalRequest {
   resolvedByPersonId?: string;
 }
 
+export interface DiscipleshipJournal {
+  id: string;
+  pairId: string;
+  authorId: string;
+  content: string;
+  createdAt: string;
+}
+
 export interface Ministry {
   id: string;
   name: string;

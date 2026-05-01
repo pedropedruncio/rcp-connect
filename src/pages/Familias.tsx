@@ -1,12 +1,12 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Home, Plus, Save, Users, AlertCircle, Check, X } from 'lucide-react';
+import { Home, Plus, Save, Users, AlertCircle, Check, X, UserMinus } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 import Toast from '../components/ui/Toast';
 import type { Family, FamilyRemovalRequest } from '../types/domain';
 
 export default function Familias() {
-  const { addFamily, families, supports, updateFamily, familyRemovalRequests, persons, resolveFamilyRemoval } = useData();
+  const { addFamily, families, supports, updateFamily, familyRemovalRequests, persons, resolveFamilyRemoval, familyMembers, removeFamilyMember } = useData();
   const [editingFamily, setEditingFamily] = React.useState<Family | null>(null);
   const [formValue, setFormValue] = React.useState('');
   const [toast, setToast] = React.useState<{ show: boolean; msg: string; type?: 'success' | 'error' | 'info' }>({
@@ -161,9 +161,44 @@ export default function Familias() {
               </div>
               <h3 className="text-xl font-bold text-slate-900">{family.name}</h3>
               <p className="mt-2 text-sm text-slate-500">Campus: {family.campus}</p>
-              <div className="mt-6 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
-                <Users className="h-4 w-4" />
-                {family.memberIds.length} membros associados
+              
+              <div className="mt-6 space-y-4">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
+                  <Users className="h-4 w-4" />
+                  {familyMembers.filter(m => m.familyId === family.id && m.status === 'ACCEPTED').length} membros associados
+                </div>
+                
+                <div className="space-y-2">
+                  {familyMembers
+                    .filter(m => m.familyId === family.id && m.status === 'ACCEPTED')
+                    .map(member => {
+                      const person = persons.find(p => p.id === member.personId);
+                      return (
+                        <div key={member.id} className="flex items-center justify-between rounded bg-slate-50 p-2 text-sm">
+                          <span className="font-medium text-slate-700">
+                            {person ? `${person.firstName} ${person.lastName}` : 'Desconhecido'}
+                          </span>
+                          <button
+                            onClick={async () => {
+                              if (confirm(`Remover ${person?.firstName || 'este membro'} da família ${family.name}?`)) {
+                                try {
+                                  await removeFamilyMember(member.id);
+                                  setToast({ show: true, msg: 'Membro removido com sucesso.', type: 'success' });
+                                } catch (err: any) {
+                                  setToast({ show: true, msg: err.message ?? 'Erro ao remover membro.', type: 'error' });
+                                }
+                              }
+                            }}
+                            className="text-slate-400 hover:text-red-600 transition-colors"
+                            title="Remover diretamente"
+                          >
+                            <UserMinus className="h-4 w-4" />
+                          </button>
+                        </div>
+                      );
+                    })
+                  }
+                </div>
               </div>
             </div>
           ))

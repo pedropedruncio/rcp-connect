@@ -18,6 +18,8 @@ import type {
   Schedule,
   SystemNotification,
   UserRecord,
+  FamilyRemovalRequest,
+  DiscipleshipJournal,
 } from '../types/domain';
 
 export const PERSON_STATUS_OPTIONS: PersonStatus[] = ['VISITANTE', 'MEMBRO', 'INATIVO'];
@@ -100,5 +102,6 @@ export interface DomainState {
   settings: AppSetting[];
   prayerRequests: PrayerRequest[];
   notifications: SystemNotification[];
-  discipleshipJournals: any[];
+  discipleshipJournals: DiscipleshipJournal[];
+  familyRemovalRequests: FamilyRemovalRequest[];
 }
