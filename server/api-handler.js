@@ -1366,15 +1366,15 @@ export async function handler(event) {
       } else if (senderFamilies && senderFamilies.length > 0) {
         targetFamilyId = senderFamilies[0].familyId;
       } else {
+        // Generate the familyId locally — avoids .select().single() after INSERT
+        // which would trigger a SELECT that fails the admin-only SELECT RLS policy on Family.
         const newFamilyId = `fam_${crypto.randomUUID()}`;
-        const { data: newFam, error: famErr } = await familyClient
+        const { error: famErr } = await familyClient
           .from('Family')
-          .insert({ id: newFamilyId, name: 'Família' })
-          .select('id')
-          .single();
+          .insert({ id: newFamilyId, name: 'Família' });
 
         if (famErr) throw famErr;
-        targetFamilyId = newFam.id;
+        targetFamilyId = newFamilyId; // use the pre-generated id — no SELECT needed
 
         const { error: senderMemberErr } = await familyClient
           .from('FamilyMember')
