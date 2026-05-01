@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, Search, UserPlus, X, Users, AlertCircle, LogOut, UserMinus, ShieldAlert } from 'lucide-react';
+import { Check, Search, UserPlus, X, Users, AlertCircle, LogOut, UserMinus, ShieldAlert, Edit } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import Toast from '../components/ui/Toast';
@@ -22,8 +22,14 @@ export default function Familia() {
     acceptFamilyInvitation, 
     rejectFamilyInvitation,
     requestFamilyRemoval,
+    updateFamily,
+    families,
+    refetch,
     isLoading 
   } = useData();
+
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [newFamilyName, setNewFamilyName] = useState('');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<FamilySearchResult[]>([]);
@@ -41,6 +47,11 @@ export default function Familia() {
   const [removalTarget, setRemovalTarget] = useState<{id: string, name: string} | null>(null);
   const [removalReason, setRemovalReason] = useState('');
   const [isSubmittingRemoval, setIsSubmittingRemoval] = useState(false);
+
+  // Relationship Edit State
+  const [relEditTarget, setRelEditTarget] = useState<{id: string, name: string, relationship: string} | null>(null);
+  const [newRel, setNewRel] = useState('');
+  const [isSubmittingRel, setIsSubmittingRel] = useState(false);
 
   // 1. My pending invitations (where I am invited)
   const myPendingInvites = useMemo(() => {
@@ -71,6 +82,51 @@ export default function Familia() {
         };
       });
   }, [familyMembers, myFamilies, persons]);
+
+  // 4. Determine if I can manage this family
+  const myFamilyData = useMemo(() => {
+    if (myFamilies.length === 0) return null;
+    return families.find(f => f.id === myFamilies[0]);
+  }, [families, myFamilies]);
+
+  const canManageFamily = useMemo(() => {
+    if (!user || !myFamilyData) return false;
+    if (user.role === 'ADMIN' || user.role === 'PASTOR') return true;
+    
+    const myMemberRecord = familyMembers.find(m => m.familyId === myFamilyData.id && m.personId === user.id);
+    if (myMemberRecord?.isPrimaryContact) return true;
+
+    // Rule: Oldest accepted member
+    const acceptedMembers = familyMembers
+      .filter(m => m.familyId === myFamilyData.id && m.status === 'ACCEPTED')
+      .sort((a, b) => {
+        const dateA = a.acceptedAt ? new Date(a.acceptedAt).getTime() : 0;
+        const dateB = b.acceptedAt ? new Date(b.acceptedAt).getTime() : 0;
+        return dateA - dateB;
+      });
+    
+    return acceptedMembers[0]?.personId === user.id;
+  }, [user, myFamilyData, familyMembers]);
+
+  // 5. Pending Sent Invitations
+  const pendingSentInvites = useMemo(() => {
+    if (!myFamilyData) return [];
+    return familyMembers
+      .filter(m => m.familyId === myFamilyData.id && m.status === 'PENDING')
+      .map(m => {
+        const personData = persons.find(p => p.id === m.personId);
+        return {
+          ...m,
+          name: personData?.name ?? 'Utilizador desconhecido',
+          avatarUrl: personData?.avatarUrl ?? null,
+        };
+      });
+  }, [familyMembers, myFamilyData, persons]);
+
+  // 6. Members needing organization
+  const membersNeedingOrg = useMemo(() => {
+    return currentFamilyMembers.filter(m => !m.relationship || m.relationship === 'Membro' || m.relationship === 'Familiar');
+  }, [currentFamilyMembers]);
 
   useEffect(() => {
     const q = searchTerm.trim();
@@ -141,6 +197,24 @@ export default function Familia() {
     }
   };
 
+  const submitRelUpdate = async () => {
+    if (!relEditTarget) return;
+    setIsSubmittingRel(true);
+    try {
+      await apiRequest(`/family-members/${relEditTarget.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ relationship: newRel })
+      });
+      await refetch();
+      setToast({ show: true, msg: 'Posição familiar atualizada!', type: 'success' });
+      setRelEditTarget(null);
+    } catch (err: any) {
+      setToast({ show: true, msg: err.message ?? 'Erro ao atualizar posição.', type: 'error' });
+    } finally {
+      setIsSubmittingRel(false);
+    }
+  };
+
   const handleAccept = async (memberId: string) => {
     try {
       await acceptFamilyInvitation(memberId);
@@ -156,6 +230,17 @@ export default function Familia() {
       setToast({ show: true, msg: 'Convite recusado.', type: 'success' });
     } catch (err: any) {
       setToast({ show: true, msg: 'Erro ao recusar convite.', type: 'error' });
+    }
+  };
+
+  const handleUpdateFamilyName = async () => {
+    if (!myFamilyData || !newFamilyName.trim()) return;
+    try {
+      await updateFamily(myFamilyData.id, { name: newFamilyName.trim() });
+      setToast({ show: true, msg: 'Nome da família atualizado!', type: 'success' });
+      setIsEditingName(false);
+    } catch (err: any) {
+      setToast({ show: true, msg: err.message ?? 'Erro ao atualizar nome.', type: 'error' });
     }
   };
 
@@ -217,6 +302,94 @@ export default function Familia() {
         </div>
       )}
 
+      {canManageFamily && myFamilyData ? (
+        <div className="card-heritage p-6 bg-white border-gold/20 shadow-md">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 bg-gold/10 rounded-lg flex items-center justify-center">
+                <ShieldAlert className="h-6 w-6 text-gold" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">Gestão da família</h3>
+                <p className="text-sm text-slate-500">Painel exclusivo para organizadores da casa</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => {
+                  setNewFamilyName(myFamilyData.name);
+                  setIsEditingName(true);
+                }}
+                className="btn-secondary-heritage text-sm"
+              >
+                Editar nome
+              </button>
+              <button 
+                onClick={() => document.getElementById('search-input')?.focus()}
+                className="btn-primary-heritage text-sm"
+              >
+                Convidar familiar
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Family Name Info */}
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Nome da Família</p>
+              <p className="text-lg font-semibold text-slate-900">{myFamilyData.name}</p>
+            </div>
+
+            {/* Pending Actions */}
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Ações Pendentes</p>
+              {membersNeedingOrg.length > 0 ? (
+                <div className="flex items-center gap-2 text-gold">
+                  <AlertCircle className="h-4 w-4" />
+                  <p className="text-sm font-medium">Organiza os membros da tua família ({membersNeedingOrg.length})</p>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">Tudo organizado!</p>
+              )}
+            </div>
+
+            {/* Invitations Summary */}
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Convites Pendentes</p>
+              <p className="text-sm text-slate-900 font-medium">{pendingSentInvites.length} enviado(s)</p>
+            </div>
+          </div>
+
+          {pendingSentInvites.length > 0 && (
+            <div className="mt-8">
+              <h4 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <UserPlus className="h-4 w-4 text-gold" /> Convites pendentes enviados
+              </h4>
+              <div className="flex flex-wrap gap-4">
+                {pendingSentInvites.map(invite => (
+                  <div key={invite.id} className="flex items-center gap-3 bg-white border border-slate-100 rounded-full pl-1 pr-4 py-1 shadow-sm">
+                    <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 overflow-hidden">
+                      {invite.avatarUrl ? <img src={invite.avatarUrl} alt={invite.name} className="h-full w-full object-cover" /> : invite.name.substring(0, 1)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-900 leading-none">{invite.name}</p>
+                      <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-tight">{invite.relationship} • Pendente</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="card-heritage p-6 border-slate-200 bg-slate-50/50">
+          <p className="text-sm text-slate-500 text-center italic">
+            O painel de gestão está disponível apenas para o organizador da família.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         {/* Current Family Members */}
         <div className="lg:col-span-2 space-y-6">
@@ -254,8 +427,20 @@ export default function Familia() {
                           {member.name} 
                           {member.personId === user?.id && <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">(Tu)</span>}
                         </p>
-                        <p className="text-sm text-slate-500">
+                        <p className="text-sm text-slate-500 flex items-center gap-2">
                           {member.relationship}
+                          {canManageFamily && (
+                            <button 
+                              onClick={() => {
+                                setRelEditTarget({ id: member.id, name: member.name, relationship: member.relationship });
+                                setNewRel(member.relationship);
+                              }}
+                              className="text-gold hover:text-gold-dark transition-colors"
+                              title="Editar posição"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </button>
+                          )}
                           {member.acceptedAt && <span className="ml-2 text-xs text-slate-400">• Desde {new Date(member.acceptedAt).toLocaleDateString('pt-PT')}</span>}
                         </p>
                       </div>
@@ -291,6 +476,7 @@ export default function Familia() {
                 <Search className="h-4 w-4 text-slate-400" />
               </div>
               <input
+                id="search-input"
                 type="text"
                 placeholder="Pesquisar pessoa..."
                 value={searchTerm}
@@ -472,6 +658,123 @@ export default function Familia() {
                   className="px-4 py-2 bg-red-600 text-white font-medium rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isSubmittingRemoval ? 'A solicitar...' : 'Solicitar Remoção'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Family Name Modal */}
+      <AnimatePresence>
+        {isEditingName && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              onClick={() => setIsEditingName(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                <h3 className="text-lg font-bold text-slate-900">Editar Nome da Família</h3>
+                <button onClick={() => setIsEditingName(false)} className="text-slate-400 hover:text-slate-500">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Nome da Família / Casa</label>
+                  <input 
+                    type="text"
+                    value={newFamilyName}
+                    onChange={e => setNewFamilyName(e.target.value)}
+                    placeholder="Ex: Família Silva"
+                    className="input-heritage w-full"
+                    autoFocus
+                  />
+                </div>
+                <p className="text-xs text-slate-500">
+                  Este nome será visível para todos os membros da família e na gestão da igreja.
+                </p>
+              </div>
+
+              <div className="border-t border-slate-100 bg-slate-50 px-6 py-4 flex justify-end gap-3">
+                <button onClick={() => setIsEditingName(false)} className="btn-secondary-heritage">Cancelar</button>
+                <button 
+                  onClick={handleUpdateFamilyName}
+                  disabled={!newFamilyName.trim() || newFamilyName === myFamilyData?.name}
+                  className="btn-primary-heritage"
+                >
+                  Salvar Alteração
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Relationship Edit Modal */}
+      <AnimatePresence>
+        {relEditTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              onClick={() => setRelEditTarget(null)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                <h3 className="text-lg font-bold text-slate-900">Editar Posição Familiar</h3>
+                <button onClick={() => setRelEditTarget(null)} className="text-slate-400 hover:text-slate-500">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-slate-600">
+                  Define a posição de <strong className="text-slate-900">{relEditTarget.name}</strong> na família.
+                </p>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Parentesco / Posição</label>
+                  <select 
+                    value={newRel} 
+                    onChange={e => setNewRel(e.target.value)}
+                    className="input-heritage w-full"
+                  >
+                    <option value="Cônjuge">Cônjuge</option>
+                    <option value="Filho/a">Filho/a</option>
+                    <option value="Pai/Mãe">Pai/Mãe</option>
+                    <option value="Irmão/Irmã">Irmão/Irmã</option>
+                    <option value="Familiar">Outro Familiar</option>
+                    <option value="Membro">Membro do Agregado</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 bg-slate-50 px-6 py-4 flex justify-end gap-3">
+                <button onClick={() => setRelEditTarget(null)} className="btn-secondary-heritage">Cancelar</button>
+                <button 
+                  onClick={submitRelUpdate}
+                  disabled={isSubmittingRel || newRel === relEditTarget.relationship}
+                  className="btn-primary-heritage"
+                >
+                  {isSubmittingRel ? 'A salvar...' : 'Salvar Alteração'}
                 </button>
               </div>
             </motion.div>

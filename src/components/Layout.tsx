@@ -1,41 +1,15 @@
 import React, { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import { Search, Bell, Settings, User, Menu, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../lib/utils';
+import { Search, Menu, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useData } from '../contexts/DataContext';
 import { getRoleLabel } from '../lib/roleLabels';
 
 export default function Layout() {
   const { user } = useAuth();
-  const { notifications, markNotificationAsRead, markAllNotificationsAsRead } = useData();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
-  const isLeadershipUser = user?.role === 'ADMIN' || user?.role === 'PASTOR';
-  const myNotifications = notifications.filter(n => {
-    const content = n.content ?? {};
-    const targetPersonId = content.targetPersonId;
-    const targetPersonIds = Array.isArray(content.targetPersonIds) ? content.targetPersonIds : [];
-    const targetRoles = Array.isArray(content.targetRoles)
-      ? content.targetRoles
-      : content.targetRole
-        ? [content.targetRole]
-        : [];
-
-    if (isLeadershipUser) return true;
-    if (targetPersonId) return targetPersonId === user?.id;
-    if (targetPersonIds.length > 0) return targetPersonIds.includes(user?.id ?? '');
-    if (targetRoles.length > 0) return targetRoles.includes(user?.role ?? '');
-
-    return false;
-  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  const unreadNotifications = myNotifications.filter(n => !n.readBy?.includes(user?.id || ''));
-  const unreadCount = unreadNotifications.length;
   const isLoginPage = location.pathname === '/login';
 
   if (isLoginPage) {
