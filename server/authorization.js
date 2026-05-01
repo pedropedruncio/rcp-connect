@@ -371,5 +371,45 @@ export async function assertMutationPermission({ client, authUser, method, resou
     return;
   }
 
+  if (resource === 'family-members') {
+    if (method !== 'PATCH' || !id) throw httpError(404, 'Endpoint não encontrado.');
+
+    if (isPastorOrAdmin(authUser)) return;
+
+    const { data: member, error } = await client
+      .from('FamilyMember')
+      .select('familyId, personId')
+      .eq('id', id)
+      .single();
+    
+    if (error || !member) throw forbidden('Membro da família não encontrado.');
+
+    const { data: myMemberRecord, error: myErr } = await client
+      .from('FamilyMember')
+      .select('isPrimaryContact, status')
+      .eq('familyId', member.familyId)
+      .eq('personId', authUser.id)
+      .single();
+    
+    if (myErr || !myMemberRecord || myMemberRecord.status !== 'ACCEPTED') {
+       throw forbidden('Não pertence a esta família.');
+    }
+
+    if (myMemberRecord.isPrimaryContact) return;
+
+    const { data: oldestMember } = await client
+      .from('FamilyMember')
+      .select('personId')
+      .eq('familyId', member.familyId)
+      .eq('status', 'ACCEPTED')
+      .order('acceptedAt', { ascending: true })
+      .limit(1)
+      .single();
+    
+    if (oldestMember?.personId === authUser.id) return;
+
+    throw forbidden('Apenas o organizador da família pode editar posições familiares.');
+  }
+
   throw httpError(404, 'Endpoint não encontrado.');
 }

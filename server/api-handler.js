@@ -1044,6 +1044,7 @@ async function handleMutation(client, authUser, method, path, body) {
   if (resource === 'follow-ups' && method === 'PATCH' && id) return updateRow(client, 'FollowUp', id, body);
   if (resource === 'families' && method === 'POST') return insertRow(client, 'Family', body);
   if (resource === 'families' && method === 'PATCH' && id) return updateRow(client, 'Family', id, body);
+  if (resource === 'family-members' && method === 'PATCH' && id) return updateRow(client, 'FamilyMember', id, body);
   if (resource === 'ministries' && method === 'POST') return insertRow(client, 'Ministry', body);
   if (resource === 'ministries' && method === 'PATCH' && id) return updateRow(client, 'Ministry', id, body);
   if (resource === 'events' && method === 'POST') return insertRow(client, 'Event', body);
