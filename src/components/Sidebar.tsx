@@ -9,6 +9,7 @@ import { cn } from '@/src/lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { getRoleLabel } from '../lib/roleLabels';
+import { useData } from '../contexts/DataContext';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -17,8 +18,11 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user, logout } = useAuth();
+  const { familyMembers } = useData();
   const navigate = useNavigate();
   const p = usePermissions();
+
+  const pendingInvitesCount = familyMembers?.filter(m => m.personId === user?.id && m.status === 'PENDING').length || 0;
 
   const handleLogout = () => {
     logout();
@@ -94,7 +98,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             )}
           >
             <item.icon className="w-[18px] h-[18px] flex-shrink-0" />
-            <span>{item.label}</span>
+            <span className="flex-1">{item.label}</span>
+            {item.path === '/familia' && pendingInvitesCount > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm">
+                {pendingInvitesCount}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>
