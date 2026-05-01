@@ -1315,9 +1315,53 @@ export async function handler(event) {
       return json(200, { avatarUrl }, auth.cookies);
     }
 
+    if (method === 'POST' && path === '/family') {
+      const body = event.body ? JSON.parse(event.body) : {};
+      const { name, notes, relationship } = body;
+      const currentPersonId = await getCurrentPersonId(auth.client, auth.user);
+      const familyClient = createPrivilegedClient() ?? auth.client;
+
+      const familyName = name ? name.trim() : 'Família';
+      const userRelationship = relationship ? relationship.trim() : 'Responsável';
+
+      const { data: senderFamilies, error: senderFamiliesError } = await familyClient
+        .from('FamilyMember')
+        .select('familyId')
+        .eq('personId', currentPersonId)
+        .eq('status', 'ACCEPTED');
+      
+      if (senderFamiliesError) throw senderFamiliesError;
+      if (senderFamilies && senderFamilies.length > 0) {
+         return json(400, { error: 'Já pertence a uma família.' }, auth.cookies);
+      }
+
+      const newFamilyId = `fam_${crypto.randomUUID()}`;
+      const { error: famErr } = await familyClient
+        .from('Family')
+        .insert({ id: newFamilyId, name: familyName, notes: notes || null });
+
+      if (famErr) throw famErr;
+
+      const { error: senderMemberErr } = await familyClient
+        .from('FamilyMember')
+        .insert({
+          id: `fam_mem_${crypto.randomUUID()}`,
+          familyId: newFamilyId,
+          personId: currentPersonId,
+          relationship: userRelationship,
+          isPrimaryContact: true,
+          status: 'ACCEPTED',
+          acceptedAt: new Date().toISOString()
+        });
+
+      if (senderMemberErr) throw senderMemberErr;
+
+      return json(200, { ok: true, familyId: newFamilyId }, auth.cookies);
+    }
+
     if (method === 'POST' && path === '/family-members/invite') {
       const body = event.body ? JSON.parse(event.body) : {};
-      const { targetPersonId, relationship, familyId } = body;
+      const { targetPersonId, relationship, familyId, message } = body;
       const currentPersonId = await getCurrentPersonId(auth.client, auth.user);
       const familyClient = createPrivilegedClient() ?? auth.client;
       const normalizedRelationship = typeof relationship === 'string' ? relationship.trim() : '';
@@ -1366,28 +1410,7 @@ export async function handler(event) {
       } else if (senderFamilies && senderFamilies.length > 0) {
         targetFamilyId = senderFamilies[0].familyId;
       } else {
-        // Generate the familyId locally — avoids .select().single() after INSERT
-        // which would trigger a SELECT that fails the admin-only SELECT RLS policy on Family.
-        const newFamilyId = `fam_${crypto.randomUUID()}`;
-        const { error: famErr } = await familyClient
-          .from('Family')
-          .insert({ id: newFamilyId, name: 'Família' });
-
-        if (famErr) throw famErr;
-        targetFamilyId = newFamilyId; // use the pre-generated id — no SELECT needed
-
-        const { error: senderMemberErr } = await familyClient
-          .from('FamilyMember')
-          .insert({
-            id: `fam_mem_${crypto.randomUUID()}`,
-            familyId: targetFamilyId,
-            personId: currentPersonId,
-            relationship: 'Titular',
-            isPrimaryContact: true,
-            status: 'ACCEPTED',
-          });
-
-        if (senderMemberErr) throw senderMemberErr;
+         return json(400, { error: 'Precisa criar uma família primeiro antes de enviar convites.' }, auth.cookies);
       }
 
       const { data: existingPendingInvite, error: pendingInviteError } = await familyClient
@@ -1410,15 +1433,24 @@ export async function handler(event) {
         relationship: normalizedRelationship,
         isPrimaryContact: false,
         status: 'PENDING',
+        invitedByPersonId: currentPersonId
       });
 
       if (inviteErr) throw inviteErr;
+
+      const { data: familyInfo } = await familyClient.from('Family').select('name').eq('id', targetFamilyId).single();
+      const familyName = familyInfo?.name || 'sua família';
+
+      const currentPersonResponse = await familyClient.from('Person').select('firstName, lastName').eq('id', currentPersonId).single();
+      const currentPersonName = currentPersonResponse.data ? `${currentPersonResponse.data.firstName} ${currentPersonResponse.data.lastName}`.trim() : 'Alguém';
+
+      const notificationMessage = message || `${currentPersonName} está a convidar-te para fazer parte da ${familyName} como ${normalizedRelationship}.`;
 
       await insertSystemNotification(familyClient, {
         type: 'FAMILY_INVITE',
         content: {
           title: 'Convite familiar',
-          message: 'Recebeu um convite para integrar uma família.',
+          message: notificationMessage,
           targetPersonId,
         },
       });
@@ -1432,7 +1464,7 @@ export async function handler(event) {
       const familyClient = createPrivilegedClient() ?? auth.client;
       const { data: acceptedInvite, error: updateErr } = await familyClient
         .from('FamilyMember')
-        .update({ status: 'ACCEPTED' })
+        .update({ status: 'ACCEPTED', acceptedAt: new Date().toISOString() })
         .eq('id', memberId)
         .eq('personId', currentPersonId)
         .eq('status', 'PENDING')
@@ -1473,6 +1505,54 @@ export async function handler(event) {
 
       if (delErr) throw delErr;
 
+      return json(200, { ok: true }, auth.cookies);
+    }
+
+    if (method === 'POST' && path === '/family-members/removal-request') {
+      const body = event.body ? JSON.parse(event.body) : {};
+      const { personIdToRemove, reason } = body;
+      const currentPersonId = await getCurrentPersonId(auth.client, auth.user);
+      const familyClient = createPrivilegedClient() ?? auth.client;
+
+      const { data: targetMember, error: memberErr } = await familyClient
+        .from('FamilyMember')
+        .select('familyId')
+        .eq('personId', personIdToRemove)
+        .eq('status', 'ACCEPTED')
+        .maybeSingle();
+
+      if (memberErr) throw memberErr;
+      if (!targetMember) return json(404, { error: 'Membro não encontrado numa família.' }, auth.cookies);
+
+      const reqId = `frr_${crypto.randomUUID()}`;
+      const { error: reqErr } = await auth.client 
+        .from('FamilyRemovalRequest')
+        .insert({
+           id: reqId,
+           familyId: targetMember.familyId,
+           personId: personIdToRemove,
+           requestedByPersonId: currentPersonId,
+           reason: reason || null,
+           status: 'PENDING'
+        });
+      
+      if (reqErr) throw reqErr;
+
+      return json(200, { ok: true, requestId: reqId }, auth.cookies);
+    }
+
+    if (method === 'DELETE' && path.startsWith('/family-members/')) {
+      const memberId = path.split('/').pop();
+      if (!memberId) return json(400, { error: 'ID do membro em falta.' }, auth.cookies);
+      
+      const { error: delErr } = await auth.client
+        .from('FamilyMember')
+        .delete()
+        .eq('id', memberId);
+
+      if (delErr) {
+        return json(403, { error: 'Não tem permissões para remover este membro. Peça a um administrador ou submeta uma solicitação.' }, auth.cookies);
+      }
       return json(200, { ok: true }, auth.cookies);
     }
 
