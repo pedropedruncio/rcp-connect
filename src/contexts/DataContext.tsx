@@ -75,15 +75,19 @@ interface DataContextType extends DomainState {
   addSchedule: (schedule: ScheduleInput) => Promise<void>;
   updateSchedule: (id: string, data: Partial<ScheduleInput>) => Promise<void>;
   saveNotificationPreference: (preference: NotificationPreference) => Promise<void>;
-  inviteFamilyMember: (targetPersonId: string, relationship: string, familyId?: string) => Promise<void>;
+  createFamily: (name: string, relationship?: string, notes?: string) => Promise<string>;
+  inviteFamilyMember: (targetPersonId: string, relationship: string, familyId?: string, message?: string) => Promise<void>;
   acceptFamilyInvitation: (memberId: string) => Promise<void>;
   rejectFamilyInvitation: (memberId: string) => Promise<void>;
+  requestFamilyRemoval: (personIdToRemove: string, reason?: string) => Promise<void>;
+  removeFamilyMember: (memberId: string) => Promise<void>;
   addPrayerRequest: (request: any) => Promise<void>;
   updatePrayerRequest: (id: string, data: any) => Promise<void>;
   deletePrayerRequest: (id: string) => Promise<void>;
   markNotificationAsRead: (id: string) => Promise<void>;
   markAllNotificationsAsRead: () => Promise<void>;
   addDiscipleshipJournal: (pairId: string, content: string) => Promise<void>;
+  resolveFamilyRemoval: (requestId: string, status: 'APPROVED' | 'REJECTED') => Promise<void>;
 }
 
 type PersonRow = {
@@ -151,6 +155,8 @@ type FamilyMemberRow = {
   relationship: string;
   isPrimaryContact: boolean;
   status: 'ACCEPTED' | 'PENDING' | 'REJECTED';
+  acceptedAt?: string;
+  invitedByPersonId?: string;
 };
 
 type MinistryRow = {
@@ -229,6 +235,7 @@ const EMPTY_STATE: DomainState = {
   prayerRequests: [],
   notifications: [],
   discipleshipJournals: [],
+  familyRemovalRequests: [],
 };
 
 const DEFAULT_SUPPORTS: SchemaCapabilities = {
@@ -261,6 +268,7 @@ interface DataApiResponse {
   prayerRequests: PrayerRequestRow[];
   notifications: SystemNotificationRow[];
   discipleshipJournals: DiscipleshipJournalRow[];
+  familyRemovalRequests: FamilyRemovalRequestRow[];
 }
 
 function splitName(name: string) {
@@ -297,6 +305,7 @@ function mapDomainState(
   prayerRequestRows: PrayerRequestRow[],
   notificationRows: SystemNotificationRow[],
   discipleshipJournalRows: DiscipleshipJournalRow[],
+  familyRemovalRequestRows: FamilyRemovalRequestRow[],
 ): DomainState {
   const campusMap = new Map(campuses.map((campus) => [campus.id, campus.name]));
   const roleMap = new Map(roles.map((role) => [role.id, role.name]));
@@ -376,6 +385,8 @@ function mapDomainState(
     relationship: row.relationship ?? 'Membro',
     isPrimaryContact: row.isPrimaryContact ?? false,
     status: row.status ?? 'PENDING',
+    acceptedAt: row.acceptedAt,
+    invitedByPersonId: row.invitedByPersonId,
   }));
 
   const ministries: Ministry[] = ministryRows.map((row) => ({
@@ -484,6 +495,7 @@ function mapDomainState(
     prayerRequests,
     notifications,
     discipleshipJournals: discipleshipJournalRows,
+    familyRemovalRequests: familyRemovalRequestRows,
   };
 }
 
@@ -530,6 +542,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           data.prayerRequests || [],
           data.notifications || [],
           data.discipleshipJournals || [],
+          data.familyRemovalRequests || [],
         ),
       );
     } catch (currentError: any) {
@@ -863,13 +876,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await refetch();
   }, [refetch, supports.notificationPreferences]);
 
-  const inviteFamilyMember = useCallback(async (targetPersonId: string, relationship: string, familyId?: string) => {
+  const createFamily = useCallback(async (name: string, relationship?: string, notes?: string) => {
+    const res = await apiRequest<{ familyId: string }>('/family', {
+      method: 'POST',
+      body: JSON.stringify({ name, relationship, notes }),
+    });
+    await refetch();
+    return res.familyId;
+  }, [refetch]);
+
+  const inviteFamilyMember = useCallback(async (targetPersonId: string, relationship: string, familyId?: string, message?: string) => {
     await apiRequest('/family-members/invite', {
       method: 'POST',
       body: JSON.stringify({
         targetPersonId,
         relationship,
         familyId,
+        message,
       }),
     });
     await refetch();
@@ -887,6 +910,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await apiRequest('/family-members/reject', {
       method: 'POST',
       body: JSON.stringify({ memberId }),
+    });
+    await refetch();
+  }, [refetch]);
+
+  const requestFamilyRemoval = useCallback(async (personIdToRemove: string, reason?: string) => {
+    await apiRequest('/family-members/removal-request', {
+      method: 'POST',
+      body: JSON.stringify({ personIdToRemove, reason }),
+    });
+    await refetch();
+  }, [refetch]);
+
+  const resolveFamilyRemoval = useCallback(async (requestId: string, status: 'APPROVED' | 'REJECTED') => {
+    await apiRequest(`/family-removal-requests/${encodeURIComponent(requestId)}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    });
+    await refetch();
+  }, [refetch]);
+
+  const removeFamilyMember = useCallback(async (memberId: string) => {
+    await apiRequest(`/family-members/${encodeURIComponent(memberId)}`, {
+      method: 'DELETE',
     });
     await refetch();
   }, [refetch]);
@@ -977,15 +1023,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     addSchedule,
     updateSchedule,
     saveNotificationPreference,
+    createFamily,
     inviteFamilyMember,
     acceptFamilyInvitation,
     rejectFamilyInvitation,
+    requestFamilyRemoval,
+    removeFamilyMember,
     addPrayerRequest,
     updatePrayerRequest,
     deletePrayerRequest,
     markNotificationAsRead,
     markAllNotificationsAsRead,
     addDiscipleshipJournal,
+    resolveFamilyRemoval,
   }), [
     addCell,
     addDiscipleshipJournal,
@@ -1014,9 +1064,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     updateMinistry,
     updatePerson,
     updateSchedule,
+    createFamily,
     inviteFamilyMember,
     acceptFamilyInvitation,
     rejectFamilyInvitation,
+    requestFamilyRemoval,
+    removeFamilyMember,
     addPrayerRequest,
     updatePrayerRequest,
     deletePrayerRequest,

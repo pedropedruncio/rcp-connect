@@ -1,18 +1,33 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Home, Plus, Save, Users } from 'lucide-react';
+import { Home, Plus, Save, Users, AlertCircle, Check, X } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 import Toast from '../components/ui/Toast';
-import type { Family } from '../types/domain';
+import type { Family, FamilyRemovalRequest } from '../types/domain';
 
 export default function Familias() {
-  const { addFamily, families, supports, updateFamily } = useData();
+  const { addFamily, families, supports, updateFamily, familyRemovalRequests, persons, resolveFamilyRemoval } = useData();
   const [editingFamily, setEditingFamily] = React.useState<Family | null>(null);
   const [formValue, setFormValue] = React.useState('');
   const [toast, setToast] = React.useState<{ show: boolean; msg: string; type?: 'success' | 'error' | 'info' }>({
     show: false,
     msg: '',
   });
+  const [isResolving, setIsResolving] = React.useState<string | null>(null);
+
+  const pendingRequests = familyRemovalRequests.filter(r => r.status === 'PENDING');
+
+  const handleResolve = async (requestId: string, status: 'APPROVED' | 'REJECTED') => {
+    setIsResolving(requestId);
+    try {
+      await resolveFamilyRemoval(requestId, status);
+      setToast({ show: true, msg: `Pedido ${status === 'APPROVED' ? 'aprovado' : 'rejeitado'} com sucesso.`, type: 'success' });
+    } catch (error: any) {
+      setToast({ show: true, msg: error?.message ?? 'Erro ao processar pedido.', type: 'error' });
+    } finally {
+      setIsResolving(null);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!formValue.trim()) return;
@@ -50,6 +65,61 @@ export default function Familias() {
       {!supports.familyMembers && (
         <div className="card-heritage border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           A associação detalhada de pessoas por família depende da tabela `FamilyMember`, já prevista na migration do repositório.
+        </div>
+      )}
+
+      {pendingRequests.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="flex items-center gap-2 text-xl font-bold text-slate-900">
+            <AlertCircle className="h-5 w-5 text-amber-500" />
+            Pedidos de Remoção Pendentes
+          </h3>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {pendingRequests.map((request) => {
+              const person = persons.find(p => p.id === request.personId);
+              const requester = persons.find(p => p.id === request.requestedByPersonId);
+              const family = families.find(f => f.id === request.familyId);
+              
+              return (
+                <div key={request.id} className="card-heritage flex items-center justify-between p-4 border-l-4 border-amber-400">
+                  <div className="space-y-1">
+                    <p className="font-bold text-slate-900">
+                      {person ? `${person.firstName} ${person.lastName}` : 'Membro desconhecido'}
+                    </p>
+                    <p className="text-sm text-slate-500">
+                      Família: <span className="font-medium text-slate-700">{family?.name || 'Desconhecida'}</span>
+                    </p>
+                    <p className="text-sm text-slate-500">
+                      Solicitado por: <span className="font-medium text-slate-700">{requester ? `${requester.firstName} ${requester.lastName}` : 'Desconhecido'}</span>
+                    </p>
+                    {request.reason && (
+                      <p className="mt-2 rounded bg-slate-50 p-2 text-xs italic text-slate-600">
+                        "{request.reason}"
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={isResolving === request.id}
+                      onClick={() => handleResolve(request.id, 'REJECTED')}
+                      className="rounded-full p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                      title="Rejeitar pedido"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                    <button
+                      disabled={isResolving === request.id}
+                      onClick={() => handleResolve(request.id, 'APPROVED')}
+                      className="rounded-full p-2 text-slate-400 hover:bg-green-50 hover:text-green-600 transition-colors"
+                      title="Aprovar remoção"
+                    >
+                      <Check className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

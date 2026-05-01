@@ -517,6 +517,7 @@ async function getData(client, authUser) {
     prayerRequestsResult,
     notificationsResult,
     discipleshipJournalsResult,
+    familyRemovalRequestsResult,
   ] = await Promise.all([
     // Tabelas Primárias (Obrigatórias)
     client.from('Campus').select('id, name').order('name'),
@@ -541,6 +542,7 @@ async function getData(client, authUser) {
     optionalSelect(client, 'PrayerRequest', 'id, personId, request, status, createdAt'),
     optionalSelect(client, 'SystemNotification', 'id, type, content, readBy, createdAt'),
     optionalSelect(client, 'DiscipleshipJournal', 'id, pairId, authorId, content, createdAt'),
+    isAdmin(authUser) ? optionalSelect(client, 'FamilyRemovalRequest', '*') : Promise.resolve({ available: true, data: [] }),
   ]);
 
   // Apenas Campus, Role, User, Person e CellGroup são estritamente obrigatórios para o app iniciar
@@ -587,6 +589,7 @@ async function getData(client, authUser) {
     prayerRequests: prayerRequestsResult.data || [],
     notifications: notificationRows,
     discipleshipJournals: discipleshipJournalRows,
+    familyRemovalRequests: familyRemovalRequestsResult.data || [],
   };
 }
 
@@ -1539,6 +1542,51 @@ export async function handler(event) {
       if (reqErr) throw reqErr;
 
       return json(200, { ok: true, requestId: reqId }, auth.cookies);
+    }
+
+    if (method === 'POST' && path.startsWith('/family-removal-requests/') && path.endsWith('/resolve')) {
+      const requestId = path.split('/')[2];
+      const { status } = event.body ? JSON.parse(event.body) : {};
+      const authUser = await getAuthUser(auth.client, auth.user);
+      const privilegedClient = createPrivilegedClient() ?? auth.client;
+
+      if (!isAdmin(authUser)) return json(403, { error: 'Apenas administradores podem resolver pedidos.' }, auth.cookies);
+      if (!['APPROVED', 'REJECTED'].includes(status)) return json(400, { error: 'Estado inválido.' }, auth.cookies);
+
+      const { data: request, error: reqErr } = await privilegedClient
+        .from('FamilyRemovalRequest')
+        .select('*')
+        .eq('id', requestId)
+        .single();
+
+      if (reqErr || !request) return json(404, { error: 'Pedido não encontrado.' }, auth.cookies);
+      if (request.status !== 'PENDING') return json(400, { error: 'Este pedido já foi resolvido.' }, auth.cookies);
+
+      const updateData = {
+        status,
+        resolvedAt: new Date().toISOString(),
+        resolvedByPersonId: authUser.id
+      };
+
+      const { error: updateErr } = await privilegedClient
+        .from('FamilyRemovalRequest')
+        .update(updateData)
+        .eq('id', requestId);
+
+      if (updateErr) throw updateErr;
+
+      if (status === 'APPROVED') {
+        // ACTUALLY REMOVE THE MEMBER
+        const { error: delErr } = await privilegedClient
+          .from('FamilyMember')
+          .delete()
+          .eq('familyId', request.familyId)
+          .eq('personId', request.personId);
+        
+        if (delErr) throw delErr;
+      }
+
+      return json(200, { ok: true }, auth.cookies);
     }
 
     if (method === 'DELETE' && path.startsWith('/family-members/')) {

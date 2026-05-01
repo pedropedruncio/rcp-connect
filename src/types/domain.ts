@@ -75,6 +75,27 @@ export interface CellGroup {
   growth: number;
 }
 
+export interface DomainState {
+  campuses: Campus[];
+  roles: RoleRecord[];
+  users: UserRecord[];
+  persons: Person[];
+  cells: CellGroup[];
+  discipleshipPairs: DiscipleshipPair[];
+  followUps: FollowUp[];
+  families: Family[];
+  familyMembers: FamilyMember[];
+  ministries: Ministry[];
+  events: EventItem[];
+  schedules: Schedule[];
+  preferences: NotificationPreference[];
+  settings: AppSetting[];
+  prayerRequests: any[];
+  notifications: SystemNotification[];
+  discipleshipJournals: DiscipleshipJournal[];
+  familyRemovalRequests: FamilyRemovalRequest[];
+}
+
 export interface DiscipleshipPair {
   id: string;
   mentorId: string;
@@ -113,6 +134,20 @@ export interface FamilyMember {
   relationship: string;
   isPrimaryContact: boolean;
   status: 'ACCEPTED' | 'PENDING' | 'REJECTED';
+  acceptedAt?: string;
+  invitedByPersonId?: string;
+}
+
+export interface FamilyRemovalRequest {
+  id: string;
+  familyId: string;
+  personId: string;
+  requestedByPersonId: string;
+  reason: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
+  resolvedAt?: string;
+  resolvedByPersonId?: string;
 }
 
 export interface Ministry {
