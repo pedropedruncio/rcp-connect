@@ -4,7 +4,7 @@
 -- Fix: Allow users to read their own family members and members of their accepted families.
 
 -- 1. Create a helper function to avoid infinite recursion in RLS policies
-CREATE OR REPLACE FUNCTION public.is_family_member(_family_id uuid)
+CREATE OR REPLACE FUNCTION public.is_family_member(_family_id text)
 RETURNS boolean
 LANGUAGE sql SECURITY DEFINER SET search_path = public
 AS $$
